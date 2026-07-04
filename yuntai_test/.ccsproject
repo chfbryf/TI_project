@@ -3,6 +3,6 @@
 <projectOptions>
 	<connection value="common/targetdb/connections/TIXDS110_Connection.xml"/>
 	<activeTargetConfiguration value="targetConfigs/MSPM0G3507.ccxml"/>
-	<origin value="C:/Downloads/test"/>
+	<origin value=""/>
 	<deviceFamily value="TMS470"/>
 </projectOptions>
