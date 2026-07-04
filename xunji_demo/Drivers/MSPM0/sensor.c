@@ -1,0 +1,23 @@
+#include "sensor.h"
+
+static volatile int32_t   sensor_err;
+
+/**
+ * @brief 根据灰度传感器数据计算位置误差
+ */
+void Get_error(void)
+{
+        if(L2)            sensor_err = 200;
+        else if(L1 && M)  sensor_err = 50;
+        else if(L1)       sensor_err = 100;
+        else if(M && R1)  sensor_err = -50;
+        else if(M)        sensor_err = 0;
+        else if(R1)       sensor_err = -100;
+        else if(R2)       sensor_err = -200;
+        else              sensor_err = 0;
+}
+
+int32_t Error(void)
+{
+        return sensor_err;
+}
