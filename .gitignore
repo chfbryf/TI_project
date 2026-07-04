@@ -1,0 +1,45 @@
+# IDE settings
+.settings/
+.theia/
+.idea/
+.vscode/
+.clangd/
+.clangd
+.devcontainer/
+
+# CCS project files (contain local workspace paths)
+.ccsproject
+.cproject
+.project
+
+# Build outputs
+Debug/
+Release/
+build/
+cmake-build-*/
+
+# Compiled objects
+*.o
+*.d
+*.out
+*.map
+*.elf
+*.bin
+*.hex
+
+# CCS/Theia artifacts
+*.opt
+*.genlibs
+*.mk
+compile_commands.json
+launch.json
+Event.dot
+
+# Target debug configs (user-specific)
+targetConfigs/
+
+# IDE generated HTML
+README.html
+
+# Temporary files
+Untitled.txt
