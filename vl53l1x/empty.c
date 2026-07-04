@@ -31,11 +31,79 @@
  */
 
 #include "ti_msp_dl_config.h"
+#include "vl53l1x.h"
+#include <stdio.h>
+
+void GROUP1_IRQHandler(void)
+{
+    switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1)) {
+    case DL_INTERRUPT_GROUP1_IIDX_GPIOB:
+        if (DL_GPIO_getEnabledInterruptStatus(GPIO_VL53L1x_PORT,
+                GPIO_VL53L1x_INT_PIN) & GPIO_VL53L1x_INT_PIN) {
+            DL_GPIO_clearInterruptStatus(GPIO_VL53L1x_PORT,
+                GPIO_VL53L1x_INT_PIN);
+            VL53L1X_NotifyDataReady();
+        }
+        break;
+    default:
+        break;
+    }
+}
 
 int main(void)
 {
+    uint16_t distance;
+    int8_t ret;
+
     SYSCFG_DL_init();
+    NVIC_EnableIRQ(GPIO_VL53L1x_INT_IRQN);
+
+    VL53L1X_Init(I2C_VL53L1x_INST);
 
     while (1) {
+        ret = VL53L1X_GetDistance(&distance);
+        if (ret == 0)
+            printf("%.2f m\r\n", distance / 1000.0);
+        delay_cycles(32000);
     }
+}
+
+int __io_putchar(int ch)
+{
+    while (DL_UART_isBusy(UART_0_INST) == true);
+    DL_UART_Main_transmitData(UART_0_INST, ch);
+    return ch;
+}
+
+int _write(int fd, const char *ptr, int len)
+{
+    (void)fd;
+    for (int i = 0; i < len; i++) {
+        __io_putchar(ptr[i]);
+    }
+    return len;
+}
+
+int fputc(int ch, FILE *stream)
+{
+    (void)stream;
+    return __io_putchar(ch);
+}
+
+int fputs(const char *restrict s, FILE *restrict stream)
+{
+    (void)stream;
+    int char_len = 0;
+    while (*s != 0) {
+        __io_putchar(*s++);
+        char_len++;
+    }
+    return char_len;
+}
+
+int puts(const char *ptr)
+{
+    int len = fputs(ptr, stdout);
+    __io_putchar('\n');
+    return len + 1;
 }
