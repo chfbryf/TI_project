@@ -76,9 +76,9 @@ void speed(uint8_t keyspeed) //任务函数
     
 }
 
-void renwu(uint8_t keyquan)
+void renwu(uint8_t keymode)
 {
-    switch(key.keyquan)
+    switch(key.keymode)
     {
         case 1:
         renwu1();
@@ -109,7 +109,7 @@ void renwu(uint8_t keyquan)
                 App_PWM_Set_R(0);
                 base_speed = 0;
                 key.keyspeed = 0;
-                key.keyquan = 0;
+                key.keymode = 0;
             }
                 break;
 
@@ -167,7 +167,7 @@ int main(void)
 
     OLED_ShowString(0,0,(uint8_t *)"yaw",8);
     OLED_ShowString(0,2,(uint8_t *)"mode",8);
-    OLED_ShowString(0,4,(uint8_t *)"quan",8);
+    OLED_ShowString(0,4,(uint8_t *)"renwu",8);
     OLED_ShowString(0,6,(uint8_t *)"speed",8);
 
     while (1) 
@@ -189,7 +189,7 @@ int main(void)
         OLED_ShowString(5*8,0,oled_buffer,16);
         sprintf((char *)oled_buffer, "%d", mode);
         OLED_ShowString(5*8,2,oled_buffer,16);
-        sprintf((char *)oled_buffer, "%d", key.keyquan);
+        sprintf((char *)oled_buffer, "%d", key.keymode);
         OLED_ShowString(5*8,4,oled_buffer,16);
         sprintf((char *)oled_buffer, "%d", key.keyspeed);
         OLED_ShowString(5*8,6,oled_buffer,16);
@@ -202,62 +202,12 @@ int main(void)
                 
 
         //任务代码
-        /*renwu(key.keyquan);
+        renwu(key.keymode);
         if(key.start_flag == 1)
         {
             pid_calc_flag = 1;
-        }*/
-
-        //测试代码
-        if(key.keynum == 1)
-        {
-            //mode  = ;
         }
-        
-        switch(mode)
-        {
-            case 1:
-            {
-                pid_calc_flag = 0;
-                gyro_flag = 0;
-                trace_flag = 0;
-                key.start_flag = 0;
-                Motor_Reset_R();
-                Motor_Reset_L();
-                App_PWM_Set_L(0);
-                App_PWM_Set_R(0);
-                base_speed = 0;
-                key.keyspeed = 0;
-                key.keyquan = 0;
-            }
-                break;
 
-            case 2:
-            {
-                gyro_flag = 0;
-                trace_flag = 0;
-            }
-
-
-            case 3:
-            {
-                gyro_flag = 0;
-                trace_flag = 1;
-            }
-                break;
-            case 4:
-            {
-                
-                if(omega_flag == 0)target_omega = 37.0;
-                if(omega_flag == 1)target_omega = 142.0;
-                gyro_flag = 1;
-
-            }
-                break;
-            default:
-                break;
-
-        }
 
 
         App_Motor_Proc(pid_calc_flag);

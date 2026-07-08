@@ -25,7 +25,7 @@
 typedef struct{
 
 volatile uint8_t  keyspeed;
-volatile uint8_t  keyquan;
+volatile uint8_t  keymode;
 volatile uint8_t  keynum;
 volatile uint8_t  start_flag;
 
