@@ -108,8 +108,9 @@ void renwu(uint8_t keymode)
                 App_PWM_Set_L(0);
                 App_PWM_Set_R(0);
                 base_speed = 0;
-                key.keyspeed = 0;
                 key.keymode = 0;
+                key.keyspeed = 0;
+                mode = 0;
             }
                 break;
 

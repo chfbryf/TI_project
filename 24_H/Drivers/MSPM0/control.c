@@ -7,7 +7,7 @@ static volatile uint8_t B_H_flag,H_B_flag;
 
 void renwu1(void)
 {
-    mode = 1;
+    mode = 2;
     if(L2 || L1 || M || R1 || R2)
     {
         mode = 1;
@@ -33,7 +33,7 @@ void renwu2(void)
             H_B_flag = 0;
         }
     }
-    if(B0 == 2 && H0 == 2)
+    if(B0 >= 2 && H0 >= 2)
     {
         mode = 1;
     }
@@ -68,7 +68,7 @@ void renwu3(void)
         }
 
     }
-    if(B0 == 2 && H0 == 2)
+    if(B0 >= 2 && H0 >= 2)
     {
         mode = 1;
     }
@@ -104,7 +104,7 @@ void renwu4(void)
         }
 
     }
-    if(B0 == 8 && H0 == 8)
+    if(B0 >= 8 && H0 >= 8)
     {
         mode = 1;
     }
