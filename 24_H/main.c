@@ -62,15 +62,19 @@ void speed(uint8_t keyspeed) //任务函数
 
         if (keyspeed == 3) {
             base_speed = 30;
+            zhi_speed = 30;
         }
          else if (keyspeed == 2) {
             base_speed = 20;
+            zhi_speed = 20;
         }
          else if(keyspeed == 1){
             base_speed = 10;
+            zhi_speed = 10;
         }
         else {
             base_speed = 0;
+            zhi_speed = 0;
         }
     
     
@@ -78,7 +82,7 @@ void speed(uint8_t keyspeed) //任务函数
 
 void renwu(uint8_t keymode)
 {
-    switch(key.keymode)
+    switch(keymode)
     {
         case 1:
         renwu1();
@@ -108,6 +112,7 @@ void renwu(uint8_t keymode)
                 App_PWM_Set_L(0);
                 App_PWM_Set_R(0);
                 base_speed = 0;
+                zhi_speed = 0;
                 key.keymode = 0;
                 key.keyspeed = 0;
                 mode = 0;
@@ -118,8 +123,9 @@ void renwu(uint8_t keymode)
             {
                 gyro_flag = 0;
                 trace_flag = 0;
+                zhi_flag = 1;
             }
-
+                break;
 
             case 3:
             {
@@ -235,6 +241,7 @@ void TIMER_xunji_pid_INST_IRQHandler(void)
             {
             //陀螺仪控制pid
             GYRO_Proc(target_omega);
+            Tick_gyro_pid = 0;
             }
         }
 

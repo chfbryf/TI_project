@@ -56,20 +56,31 @@ int16_t Motor_Different_Position_PID(int Encoder, int Target)
 void Position_Adjust(void)
 {
     // 速度阈值检测：仅当基础速度大于2时才进入速度环
-    if(encoder_left_pid <= 5) {
-        App_Motor_SetOmega_L(0);
-    }
-    if(encoder_right_pid <= 2) {
-        App_Motor_SetOmega_R(0);
-    }
-
-
-    float omega_L = base_speed - encoder_left_pid; 
-    float omega_R = base_speed + encoder_right_pid; 
+    if(encoder_left_pid >= 5)
+    {
+        float omega_L = base_speed - encoder_left_pid; 
 
     
-    App_Motor_SetOmega_L(omega_L);
-    App_Motor_SetOmega_R(omega_R);
+        App_Motor_SetOmega_L(omega_L);
+    }
+    else
+    {
+        App_Motor_SetOmega_L(0);
+
+    }
+
+    if(encoder_right_pid >= 5)
+    {
+        float omega_R = base_speed + encoder_right_pid; 
+
+    
+        App_Motor_SetOmega_R(omega_R);
+    }
+    else
+    {
+        App_Motor_SetOmega_R(0);
+
+    }
 }
 
 

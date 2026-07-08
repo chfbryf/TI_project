@@ -6,7 +6,6 @@
 
 static int16_t motor_gyro_different_pid = 0, gyro_left_pid = 0, gyro_right_pid = 0;  // PID计算输出值
 
-#define PWM_TO_OMEGA_SCALE 0.3f
 
 // 角度环PID
 #define   Kp       1
@@ -22,8 +21,8 @@ float GYRO_Control(float now,float target)
 	Bias = target-now;
 	Pwm += Kp * (Bias - Last_bias) + Ki * Bias + Kd * (Bias - 2 * Last_bias + Last2_bias);
 
+    Last2_bias = Last_bias;
 	Last_bias = Bias;
-	Last2_bias = Last_bias;
 	return Pwm;
 }
 
@@ -34,8 +33,8 @@ float GYRO_Control(float now,float target)
 void GYRO_Adjust(void)
 {
     
-    float omega_L = base_speed - gyro_left_pid * PWM_TO_OMEGA_SCALE;
-    float omega_R = base_speed + gyro_right_pid * PWM_TO_OMEGA_SCALE;
+    float omega_L = base_speed - gyro_left_pid;
+    float omega_R = base_speed + gyro_right_pid;
     
     App_Motor_SetOmega_L(omega_L);
     App_Motor_SetOmega_R(omega_R);

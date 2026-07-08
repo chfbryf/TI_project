@@ -1,4 +1,5 @@
 #include "control.h"
+#include "motor.h"
 #include "sys.h"
 #include "sensor.h"
 
@@ -8,8 +9,15 @@ static volatile uint8_t B_H_flag,H_B_flag;
 void renwu1(void)
 {
     mode = 2;
+    if(zhi_flag == 1)
+    {
+        App_Motor_SetOmega_L(zhi_speed);
+        App_Motor_SetOmega_R(zhi_speed);
+    }
+
     if(L2 || L1 || M || R1 || R2)
     {
+        zhi_flag = 0;
         mode = 1;
     }
 }
@@ -18,15 +26,22 @@ void renwu2(void)
 {
     if(L2 || L1 || M || R1 || R2)
     {
+        zhi_flag = 0;
         mode = 3;
         H_B_flag = 1;
         if(B_H_flag == 1){
             H0++;
-            B_H_flag = 1;
+            B_H_flag = 0;
         }
     }
     else {
         mode = 2;
+        if(zhi_flag == 1)
+        {
+            App_Motor_SetOmega_L(zhi_speed);
+            App_Motor_SetOmega_R(zhi_speed);
+        }
+
         B_H_flag = 1;
         if(H_B_flag == 1){
             B0++;
