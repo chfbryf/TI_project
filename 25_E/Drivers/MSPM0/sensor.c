@@ -7,19 +7,14 @@ static volatile int32_t   sensor_err;
  */
 void Get_error(void)
 {
-        /*if(L1 && R1)    sensor_err = 0;
-        else if(L1 && L2)      sensor_err = 50;
-        else if(R1 && R2)      sensor_err = -50;
-        else if(L2)     sensor_err = 100; 
-        else if(R2)     sensor_err = -100;*/
-        if(L4)  sensor_err = 4;
-        if(L3)  sensor_err = 3;
-        if(L2)  sensor_err = 2;
-        if(L1)  sensor_err = 1;
-        if(R1)  sensor_err = -1;
-        if(R2)  sensor_err = -2;
-        if(R3)  sensor_err = -3;
-        if(R4)  sensor_err = -4;
+        if(L2)            sensor_err = 4;
+        else if(L1 && M)  sensor_err = 1;
+        else if(L1)       sensor_err = 2;
+        else if(M && R1)  sensor_err = -1;
+        else if(M)        sensor_err = 0;
+        else if(R1)       sensor_err = -2;
+        else if(R2)       sensor_err = -4;
+        else              sensor_err = 0;
 }
 
 int32_t Error(void)

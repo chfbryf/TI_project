@@ -167,17 +167,17 @@ int main(void)
         err = Error();
         printf("%d, %d\n", err, m0);
 
-
+mspm0_delay_ms(500);
         //防止重复
         if (baohu_flag == 0){
                 switch (xia_flag) {
             case 0:
-                if (L4 != 0) {
+                if (L2 != 0) {
                     xia_flag = 1;
                 }
                 break;
             case 1:
-                if (L4 == 0) {
+                if (L2 == 0) {
                     baohu_flag = 1;
                     m0++;
                     if (keyquan != 0)

@@ -56,6 +56,7 @@ static volatile float speed_L = 0.0f;
 static volatile float speed_R = 0.0f;
 
 
+
 void speed(uint8_t keyspeed) //任务函数
 {
 
@@ -79,16 +80,16 @@ void renwu(uint8_t keyquan)
 {
     switch(key.keyquan)
     {
-        case 0:
+        case 1:
         renwu1();
             break;
-        case 1:
+        case 2:
          renwu2();
             break;
-        case 2:
+        case 3:
          renwu3();
             break;
-        case 3:
+        case 4:
          renwu4();
             break;
         default:
@@ -96,7 +97,7 @@ void renwu(uint8_t keyquan)
     }
         switch(mode)
         {
-            case 0:
+            case 1:
             {
                 pid_calc_flag = 0;
                 gyro_flag = 0;
@@ -109,23 +110,23 @@ void renwu(uint8_t keyquan)
                 base_speed = 0;
                 key.keyspeed = 0;
                 key.keyquan = 0;
-
-            }
-                break;
-            case 1:
-            {
-                trace_flag = 0;
-                gyro_flag = 0;
             }
                 break;
 
             case 2:
             {
                 gyro_flag = 0;
+                trace_flag = 0;
+            }
+
+
+            case 3:
+            {
+                gyro_flag = 0;
                 trace_flag = 1;
             }
                 break;
-            case 3:
+            case 4:
             {
                 
                 if(omega_flag == 0)target_omega = 37.0;
@@ -165,7 +166,7 @@ int main(void)
     OLED_ShowString(0,4,(uint8_t *)"  Yaw",8);*/
 
     OLED_ShowString(0,0,(uint8_t *)"yaw",8);
-    OLED_ShowString(0,2,(uint8_t *)"base",8);
+    OLED_ShowString(0,2,(uint8_t *)"mode",8);
     OLED_ShowString(0,4,(uint8_t *)"quan",8);
     OLED_ShowString(0,6,(uint8_t *)"speed",8);
 
@@ -186,7 +187,7 @@ int main(void)
         //oled显示圈数
         sprintf((char *)oled_buffer, "%f", yaw);
         OLED_ShowString(5*8,0,oled_buffer,16);
-        sprintf((char *)oled_buffer, "%d", base_speed);
+        sprintf((char *)oled_buffer, "%d", mode);
         OLED_ShowString(5*8,2,oled_buffer,16);
         sprintf((char *)oled_buffer, "%d", key.keyquan);
         OLED_ShowString(5*8,4,oled_buffer,16);
@@ -215,7 +216,7 @@ int main(void)
         
         switch(mode)
         {
-            case 0:
+            case 1:
             {
                 pid_calc_flag = 0;
                 gyro_flag = 0;
@@ -228,23 +229,23 @@ int main(void)
                 base_speed = 0;
                 key.keyspeed = 0;
                 key.keyquan = 0;
-
-            }
-                break;
-            case 1:
-            {
-                trace_flag = 0;
-                gyro_flag = 0;
             }
                 break;
 
             case 2:
             {
                 gyro_flag = 0;
+                trace_flag = 0;
+            }
+
+
+            case 3:
+            {
+                gyro_flag = 0;
                 trace_flag = 1;
             }
                 break;
-            case 3:
+            case 4:
             {
                 
                 if(omega_flag == 0)target_omega = 37.0;
@@ -268,13 +269,14 @@ int main(void)
 
 
 /**
- * @brief 定时器中断回调函数（10ms周期）
+ * @brief 定时器中断回调函数（1ms周期）
  */
 void TIMER_xunji_pid_INST_IRQHandler(void)
 {
     switch (DL_TimerG_getPendingInterrupt(TIMER_xunji_pid_INST)){
         case DL_TIMER_IIDX_ZERO:
         {
+
 
         if(gyro_flag == 1)
         {
