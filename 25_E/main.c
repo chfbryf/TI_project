@@ -63,6 +63,7 @@ static volatile float speed_L = 0.0f;
 static volatile float speed_R = 0.0f;
 
 static volatile int8_t sensor;
+int16_t err;
 
 void renwu(void) //任务函数
 {
@@ -159,21 +160,24 @@ int main(void)
 
 
         //串口显示速度
-        speed_L = GetSpeed_L();
+        /*speed_L = GetSpeed_L();
         speed_R = GetSpeed_R();
-        printf("%3f, %3f\n", speed_L, speed_R);
-                
+        printf("%3f, %3f\n", speed_L, speed_R);*/
+        Get_error();
+        err = Error();
+        printf("%d, %d\n", err, m0);
+
 
         //防止重复
         if (baohu_flag == 0){
                 switch (xia_flag) {
             case 0:
-                if (L2 != 0) {
+                if (L4 != 0) {
                     xia_flag = 1;
                 }
                 break;
             case 1:
-                if (L2 == 0) {
+                if (L4 == 0) {
                     baohu_flag = 1;
                     m0++;
                     if (keyquan != 0)
