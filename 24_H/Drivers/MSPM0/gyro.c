@@ -8,7 +8,7 @@ static int16_t motor_gyro_different_pid = 0, gyro_left_pid = 0, gyro_right_pid =
 
 
 // 角度环PID
-#define   Kp       1
+#define   Kp       10
 #define   Ki       0
 #define   Kd  	   0
 
@@ -21,8 +21,11 @@ float GYRO_Control(float now,float target)
 	Bias = target-now;
 	Pwm += Kp * (Bias - Last_bias) + Ki * Bias + Kd * (Bias - 2 * Last_bias + Last2_bias);
 
-    Last2_bias = Last_bias;
-	Last_bias = Bias;
+	    Last2_bias = Last_bias;
+		Last_bias = Bias;
+
+	if(Pwm > 4000) Pwm = 4000;
+	if(Pwm < -4000) Pwm = -4000;
 	return Pwm;
 }
 

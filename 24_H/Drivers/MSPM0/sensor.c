@@ -44,9 +44,11 @@ int16_t Motor_Different_Position_PID(int Encoder, int Target)
     if(Bias == 0) Integral_bias = 0;
     
     Pwm = Position_KP * Bias + Position_KI * Integral_bias + Position_KD * (Bias - Last_Bias);
-    Last_Bias = Bias;
-    
-    return Pwm;
+	    Last_Bias = Bias;
+
+	    if(Pwm > 4000) Pwm = 4000;
+	    if(Pwm < -4000) Pwm = -4000;
+	    return Pwm;
 }
 
 
@@ -63,7 +65,7 @@ void Position_Adjust(void)
     
         App_Motor_SetOmega_L(omega_L);
     }
-    else
+    else if(encoder_left_pid >=-5)
     {
         App_Motor_SetOmega_L(0);
 
@@ -76,7 +78,7 @@ void Position_Adjust(void)
     
         App_Motor_SetOmega_R(omega_R);
     }
-    else
+    else if(encoder_right_pid >=-5)
     {
         App_Motor_SetOmega_R(0);
 

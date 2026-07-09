@@ -4,11 +4,9 @@
 /* 跨模块全局变量定义 */
 
 volatile int16_t  base_speed;
-volatile float  zhi_speed;
 
 volatile uint8_t mode;
 volatile uint8_t omega_flag;   //yaw角标志位   0、由A到C   1、由B到D
-volatile uint8_t zhi_flag;  
 
 /**
  * @brief printf重定向函数

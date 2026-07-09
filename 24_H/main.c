@@ -41,6 +41,7 @@
 #include "pid.h"
 #include "sys.h"
 #include "gyro.h"
+#include "stdint.h"
 
 
 static volatile uint8_t Tick_angle_pid;  //循迹环时间计算标志位
@@ -62,19 +63,15 @@ void speed(uint8_t keyspeed) //任务函数
 
         if (keyspeed == 3) {
             base_speed = 30;
-            zhi_speed = 30;
         }
          else if (keyspeed == 2) {
             base_speed = 20;
-            zhi_speed = 20;
         }
          else if(keyspeed == 1){
             base_speed = 10;
-            zhi_speed = 10;
         }
         else {
             base_speed = 0;
-            zhi_speed = 0;
         }
     
     
@@ -99,7 +96,11 @@ void renwu(uint8_t keymode)
         default:
             break;
     }
-        switch(mode)
+}
+
+void change_mode(uint8_t renwu_mode)
+{
+        switch(renwu_mode)
         {
             case 1:
             {
@@ -112,7 +113,6 @@ void renwu(uint8_t keymode)
                 App_PWM_Set_L(0);
                 App_PWM_Set_R(0);
                 base_speed = 0;
-                zhi_speed = 0;
                 key.keymode = 0;
                 key.keyspeed = 0;
                 mode = 0;
@@ -121,9 +121,9 @@ void renwu(uint8_t keymode)
 
             case 2:
             {
-                gyro_flag = 0;
+                gyro_flag = 1;
+                target_omega = 0;
                 trace_flag = 0;
-                zhi_flag = 1;
             }
                 break;
 
@@ -146,6 +146,7 @@ void renwu(uint8_t keymode)
                 break;
 
         }
+
 }
 
 int main(void)
@@ -210,6 +211,7 @@ int main(void)
 
         //任务代码
         renwu(key.keymode);
+        change_mode(mode);
         if(key.start_flag == 1)
         {
             pid_calc_flag = 1;
