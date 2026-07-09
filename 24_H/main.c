@@ -79,6 +79,13 @@ void speed(uint8_t keyspeed) //任务函数
 
 void renwu(uint8_t keymode)
 {
+    static uint8_t last_keymode = 0;
+    if(keymode != last_keymode)
+    {
+        renwu_reset();
+        last_keymode = keymode;
+    }
+
     switch(keymode)
     {
         case 1:
