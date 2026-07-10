@@ -5,8 +5,9 @@
 #include "gyro.h"
 #include "clock.h"
 
-static volatile uint32_t B0,H0;
-static volatile uint8_t B_H_flag,H_B_flag;
+volatile uint32_t B0,H0;
+volatile uint8_t B_H_flag,H_B_flag;
+volatile uint32_t renwu_flag;
 
 void renwu_reset(void)
 {
@@ -21,10 +22,13 @@ void renwu1(void)
     mode = 2;
     if(L2 || L1 || M || R1 || R2)
     {
-        mspm0_delay_ms(5);
-        if(L2 || L1 || M || R1 || R2)
+        if(delay_flag >= renwu_flag)
         {
-        mode = 1;
+            renwu_flag += 10;
+            if(L2 || L1 || M || R1 || R2)
+            {
+                mode = 1;
+            }
         }
     }
 }
@@ -33,14 +37,17 @@ void renwu2(void)
 {
     if(L2 || L1 || M || R1 || R2)
     {
-        mspm0_delay_ms(5);
-        if(L2 || L1 || M || R1 || R2)
+        if(delay_flag >= renwu_flag)
         {
-            mode = 3;
-            H_B_flag = 1;
-            if(B_H_flag == 1){
-                H0++;
-                B_H_flag = 0;
+            renwu_flag += 10;
+            if(L2 || L1 || M || R1 || R2)
+            {
+                mode = 3;
+                H_B_flag = 1;
+                if(B_H_flag == 1){
+                    H0++;
+                    B_H_flag = 0;
+                }
             }
         }
     }
@@ -63,15 +70,18 @@ void renwu3(void)
 {
     if(L2 || L1 || M || R1 || R2)
     {
-        mspm0_delay_ms(5);
-        if(L2 || L1 || M || R1 || R2)
+        if(delay_flag >= renwu_flag)
         {
-        mode = 3;
-        H_B_flag = 1;
-        if(B_H_flag == 1){
-            H0++;
-            B_H_flag = 0;
-        }
+            renwu_flag += 10;
+            if(L2 || L1 || M || R1 || R2)
+            {
+                mode = 3;
+                H_B_flag = 1;
+                if(B_H_flag == 1){
+                    H0++;
+                    B_H_flag = 0;
+                }
+            }
         }
     }
     else {
@@ -103,15 +113,18 @@ void renwu4(void)
 {
     if(L2 || L1 || M || R1 || R2)
     {
-        mspm0_delay_ms(5);
-        if(L2 || L1 || M || R1 || R2)
+        if(delay_flag >= renwu_flag)
         {
-        mode = 3;
-        H_B_flag = 1;
-        if(B_H_flag == 1){
-            H0++;
-            B_H_flag = 0;
-        }
+            renwu_flag += 10;
+            if(L2 || L1 || M || R1 || R2)
+            {
+                mode = 3;
+                H_B_flag = 1;
+                if(B_H_flag == 1){
+                    H0++;
+                    B_H_flag = 0;
+                }
+            }
         }
     }
     else {

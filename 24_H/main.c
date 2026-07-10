@@ -243,6 +243,11 @@ void TIMER_xunji_pid_INST_IRQHandler(void)
         case DL_TIMER_IIDX_ZERO:
         {
 
+            //非阻塞延时
+            if(trace_flag == 0)
+            {
+                delay_flag++;
+            }
 
         if(gyro_flag == 1)
         {
