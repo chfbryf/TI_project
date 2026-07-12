@@ -25,15 +25,15 @@ void Get_err2(void)
     else                    key = 0;
 
     switch (key) {
-        case 0x10: err2 =  -200; break;  /* ●○○○○ */
-        case 0x01: err2 = 200; break;  /* ○○○○● */
-        case 0x08: err2 =  -100; break;  /* ○●○○○ */
-        case 0x02: err2 = 100; break;  /* ○○○●○ */
+        case 0x10: err2 =  -20; break;  /* ●○○○○ */
+        case 0x01: err2 = 20; break;  /* ○○○○● */
+        case 0x08: err2 =  -10; break;  /* ○●○○○ */
+        case 0x02: err2 = 10; break;  /* ○○○●○ */
         case 0x04: err2 =    0; break;  /* ○○●○○ */
-        case 0x18: err2 =  -150; break;  /* ●●○○○ */
-        case 0x03: err2 = 150; break;  /* ○○○●● */
-        case 0x0C: err2 =   -50; break;  /* ○●●○○ */
-        case 0x06: err2 =  50; break;  /* ○○●●○ */
+        case 0x18: err2 =  -15; break;  /* ●●○○○ */
+        case 0x03: err2 = 15; break;  /* ○○○●● */
+        case 0x0C: err2 =   -5; break;  /* ○●●○○ */
+        case 0x06: err2 =  5; break;  /* ○○●●○ */
         default:   err2 =    0; break;  /* 多传感器或无效 → 0 */
     }
 }

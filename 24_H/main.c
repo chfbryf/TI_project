@@ -257,15 +257,14 @@ int main(void)
   
 
         //任务代码
-        renwu(key.keymode);
-        change_mode(mode);
+        /*renwu(key.keymode);
+        change_mode(mode);*/
         if(key.start_flag == 1)
         {
             pid_calc_flag = 1;
         }
 
-
-
+        trace_flag = 1;
         App_Motor_Proc(pid_calc_flag);
 
         //mspm0_delay_ms(500);

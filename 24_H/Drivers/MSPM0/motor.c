@@ -120,10 +120,8 @@ void App_Motor_Proc(uint8_t flag)
     float Omega_L = GetSpeed_L();
     float Omega_R = GetSpeed_R();
 
-    unsigned long now = mspm0_get_clock_us_now();
-
-    float ua_L = PID_Compute1(&pid_motor_L, Omega_L, now);
-    float ua_R = PID_Compute1(&pid_motor_R, Omega_R, now);
+    float ua_L = PID_Compute(&pid_motor_L, Omega_L);
+    float ua_R = PID_Compute(&pid_motor_R, Omega_R);
 
     float bat = 12;
 

@@ -10,6 +10,7 @@
 static volatile int32_t   sensor_err;
 static volatile int32_t   sensor_err2;
 
+#define threshold 0.1 //阈值检测
 
 /**
  * @brief 根据灰度传感器数据计算位置误差
@@ -61,30 +62,24 @@ int16_t Motor_Different_Position_PID(int Encoder, int Target)
 void Position_Adjust(void)
 {
     // 速度阈值检测：仅当基础速度大于2时才进入速度环
-    if(encoder_left_pid >= 5)
+    float omega_L = base_speed - encoder_left_pid;
+    if(omega_L >= threshold)
     {
-        float omega_L = base_speed - encoder_left_pid; 
-
-    
         App_Motor_SetOmega_L(omega_L);
     }
-    else if(encoder_left_pid >=-5)
+    else if(omega_L >= -threshold)
     {
         App_Motor_SetOmega_L(0);
-
     }
 
-    if(encoder_right_pid >= 5)
+    float omega_R = base_speed + encoder_right_pid;
+    if(omega_R >= threshold)
     {
-        float omega_R = base_speed + encoder_right_pid; 
-
-    
         App_Motor_SetOmega_R(omega_R);
     }
-    else if(encoder_right_pid >=-5)
+    else if(omega_R >= -threshold)
     {
         App_Motor_SetOmega_R(0);
-
     }
 }
 
