@@ -38,21 +38,21 @@ float GYRO_Control(float now,float target)
 void GYRO_Adjust(void)
 {
     float omega_L = base_speed - gyro_left_pid;
-    if(omega_L >= threshold)
+    if(omega_L >= threshold || omega_L <= -threshold)
     {
         App_Motor_SetOmega_L(omega_L);
     }
-    else if(omega_L >= -threshold)
+    else
     {
         App_Motor_SetOmega_L(0);
     }
 
     float omega_R = base_speed + gyro_right_pid;
-    if(omega_R >= threshold)
+    if(omega_R >= threshold || omega_R <= -threshold)
     {
         App_Motor_SetOmega_R(omega_R);
     }
-    else if(omega_R >= -threshold)
+    else
     {
         App_Motor_SetOmega_R(0);
     }

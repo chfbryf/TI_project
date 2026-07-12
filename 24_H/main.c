@@ -264,6 +264,7 @@ int main(void)
             pid_calc_flag = 1;
         }
 
+        base_speed = 10;
         trace_flag = 1;
         App_Motor_Proc(pid_calc_flag);
 
