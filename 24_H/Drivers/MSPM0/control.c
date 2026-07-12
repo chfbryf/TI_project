@@ -5,9 +5,12 @@
 #include "gyro.h"
 #include "clock.h"
 
-volatile uint32_t B0,H0;
-volatile uint8_t B_H_flag,H_B_flag;
+static volatile uint32_t B0,H0;
+static volatile uint8_t B_H_flag,H_B_flag;
 volatile uint32_t renwu_flag;
+static volatile uint32_t black_start;
+
+#define BLACK_DEBOUNCE_MS  50
 
 void renwu_reset(void)
 {
@@ -20,38 +23,37 @@ void renwu_reset(void)
 void renwu1(void)
 {
     mode = 2;
-    if(L2 || L1 || M || R1 || R2)
+    if((Digtal & 0xFF) != 0xFF)
     {
-        if(delay_flag >= renwu_flag)
+        if(black_start == 0) black_start = delay_flag;
+        if((delay_flag - black_start) >= BLACK_DEBOUNCE_MS)
         {
-            renwu_flag += 10;
-            if(L2 || L1 || M || R1 || R2)
-            {
-                mode = 1;
-            }
+            mode = 1;
         }
+    }
+    else
+    {
+        black_start = 0;
     }
 }
 
 void renwu2(void)
 {
-    if(L2 || L1 || M || R1 || R2)
+    if((Digtal & 0xFF) != 0xFF)
     {
-        if(delay_flag >= renwu_flag)
+        if(black_start == 0) black_start = delay_flag;
+        if((delay_flag - black_start) >= BLACK_DEBOUNCE_MS)
         {
-            renwu_flag += 10;
-            if(L2 || L1 || M || R1 || R2)
-            {
-                mode = 3;
-                H_B_flag = 1;
-                if(B_H_flag == 1){
-                    H0++;
-                    B_H_flag = 0;
-                }
+            mode = 3;
+            H_B_flag = 1;
+            if(B_H_flag == 1){
+                H0++;
+                B_H_flag = 0;
             }
         }
     }
     else {
+        black_start = 0;
         mode = 2;
 
         B_H_flag = 1;
@@ -68,24 +70,22 @@ void renwu2(void)
 
 void renwu3(void)
 {
-    if(L2 || L1 || M || R1 || R2)
+    if((Digtal & 0xFF) != 0xFF)
     {
-        if(delay_flag >= renwu_flag)
+        if(black_start == 0) black_start = delay_flag;
+        if((delay_flag - black_start) >= BLACK_DEBOUNCE_MS)
         {
-            renwu_flag += 10;
-            if(L2 || L1 || M || R1 || R2)
-            {
-                mode = 3;
-                H_B_flag = 1;
-                if(B_H_flag == 1){
-                    H0++;
-                    B_H_flag = 0;
-                }
+            mode = 3;
+            H_B_flag = 1;
+            if(B_H_flag == 1){
+                H0++;
+                B_H_flag = 0;
             }
         }
     }
     else {
-       B_H_flag = 1;
+        black_start = 0;
+        B_H_flag = 1;
         mode = 4;
         if(H_B_flag == 1){
             B0++;
@@ -111,23 +111,21 @@ void renwu3(void)
 
 void renwu4(void)
 {
-    if(L2 || L1 || M || R1 || R2)
+    if((Digtal & 0xFF) != 0xFF)
     {
-        if(delay_flag >= renwu_flag)
+        if(black_start == 0) black_start = delay_flag;
+        if((delay_flag - black_start) >= BLACK_DEBOUNCE_MS)
         {
-            renwu_flag += 10;
-            if(L2 || L1 || M || R1 || R2)
-            {
-                mode = 3;
-                H_B_flag = 1;
-                if(B_H_flag == 1){
-                    H0++;
-                    B_H_flag = 0;
-                }
+            mode = 3;
+            H_B_flag = 1;
+            if(B_H_flag == 1){
+                H0++;
+                B_H_flag = 0;
             }
         }
     }
     else {
+        black_start = 0;
         B_H_flag = 1;
         mode = 4;
         if(H_B_flag == 1){

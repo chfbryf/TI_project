@@ -49,6 +49,17 @@ uint64_t mspm0_get_clock_us_now(void)
 }
 
 /**
+ * @brief 阻塞延时函数（微秒级）
+ *
+ * @param num_us 延时时间，单位us
+ */
+void mspm0_delay_us(unsigned long num_us)
+{
+    uint64_t start = mspm0_get_clock_us_now();
+    while (mspm0_get_clock_us_now() - start < num_us);
+}
+
+/**
  * @brief 初始化SysTick定时器
  * 
  * 配置SysTick每1ms产生一次中断

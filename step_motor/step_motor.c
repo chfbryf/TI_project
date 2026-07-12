@@ -25,19 +25,11 @@ uint32_t step_remain_2 = 0;
 //
 void step_motor_Init(void)
 {
-    DL_GPIO_setPins(STEP_MOTOR_PORT, STEP_MOTOR_RST2_PIN);
-    DL_GPIO_setPins(STEP_MOTOR_PORT, STEP_MOTOR_SLP2_PIN);
     DL_GPIO_setPins(STEP_MOTOR_PORT, STEP_MOTOR_DIR2_PIN);
-    DL_GPIO_setPins(STEP_MOTOR_PORT, STEP_MOTOR_DCY2_PIN);
-    DL_GPIO_setPins(STEP_MOTOR_PORT, STEP_MOTOR_RST1_PIN);
-    DL_GPIO_setPins(STEP_MOTOR_PORT, STEP_MOTOR_SLP1_PIN);
     DL_GPIO_setPins(STEP_MOTOR_PORT, STEP_MOTOR_DIR1_PIN);
-    DL_GPIO_setPins(STEP_MOTOR_PORT, STEP_MOTOR_DCY1_PIN);
 
     NVIC_EnableIRQ(DCC_100_PWM1_INST_INT_IRQN);
     NVIC_EnableIRQ(DCC_100_PWM2_INST_INT_IRQN);
-
-
 }
 
 
@@ -111,15 +103,15 @@ void step_motor_stop(uint8_t stepper_id)
 
 //
 //@简介：设置步进电机速度
-//@参数：speed-速度，单位：Hz
+//@参数：speed-角速度，单位：度/秒
 //@参数：stepper-电机编号
 //
-void step_set_speed(uint16_t speed, uint8_t stepper_id)
+void step_set_speed(float speed, uint8_t stepper_id)
 {
     if(stepper_id == 1)
     {
 
-        uint32_t frequency = (uint32_t)(speed / 0.05625);   // 计算脉冲频率
+        uint32_t frequency = (uint32_t)(speed / 0.05625f);   // 计算脉冲频率
         frequency = frequency > 0 ? frequency : 1;
         //计算定时器溢出值
         uint32_t period = DCC_100_PWM1_INST_CLK_FREQ / frequency;
@@ -135,7 +127,7 @@ void step_set_speed(uint16_t speed, uint8_t stepper_id)
     if(stepper_id == 2)
     {
 
-        uint32_t frequency = (uint32_t)(speed / 0.05625);   // 计算脉冲频率
+        uint32_t frequency = (uint32_t)(speed / 0.05625f);   // 计算脉冲频率
         frequency = frequency > 0 ? frequency : 1;
         //计算定时器溢出值
         uint32_t period = DCC_100_PWM2_INST_CLK_FREQ / frequency;
@@ -149,17 +141,19 @@ void step_set_speed(uint16_t speed, uint8_t stepper_id)
 }
 
 
-void step_set_angle(uint8_t angle, uint8_t stepper_id)
+void step_set_angle(float angle, uint8_t stepper_id)
 {
     if(stepper_id == 1)
     {
-        step_remain_1 = (uint32_t)(angle / 0.05625);   // 计算脉冲频率
+        step_remain_1 = (uint32_t)(angle / 0.05625f);
+        step_set_speed(30.0f, 1);
         step_motor_start(stepper_id);
     }
 
     if(stepper_id == 2)
     {
-        step_remain_2 = (uint32_t)(angle / 0.05625);   // 计算脉冲频率
+        step_remain_2 = (uint32_t)(angle / 0.05625f);
+        step_set_speed(30.0f, 2);
         step_motor_start(stepper_id);
     }
 }
@@ -171,17 +165,19 @@ void DCC_100_PWM2_INST_IRQHandler()
     {
         case DL_TIMER_IIDX_LOAD:
         {
-            if(step_remain_2 == 0)
+            if(step_remain_2 > 0)
             {
-                step_motor_stop(2);
+                step_remain_2 --;
+                if(step_remain_2 == 0)
+                {
+                    step_motor_stop(2);
+                }
             }
-            step_remain_2 --;
-
             break;
         }
 
     default:
-        break;
+    break;
     }
 }
 
@@ -192,17 +188,19 @@ void DCC_100_PWM1_INST_IRQHandler()
     {
         case DL_TIMER_IIDX_LOAD:
         {
-            if(step_remain_1 == 0)
+            if(step_remain_1 > 0)
             {
-                step_motor_stop(1);
+                step_remain_1 --;
+                if(step_remain_1 == 0)
+                {
+                    step_motor_stop(1);
+                }
             }
-            step_remain_1 --;
-
             break;
         }
 
     default:
-        break;
+    break;
     }
 }
 

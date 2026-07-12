@@ -4,9 +4,12 @@
 #include "main.h"
 #include "gyro.h"
 #include "sys.h"
+#include "sensor2.h"
 
 
 static volatile int32_t   sensor_err;
+static volatile int32_t   sensor_err2;
+
 
 /**
  * @brief 根据灰度传感器数据计算位置误差
@@ -89,13 +92,17 @@ void Position_Adjust(void)
 void xunji_Proc(void)
 {
         //获取灰度传感器数据
-        Get_error();
+        //Get_error();
+        Get_err2();
 
         int16_t motor_left_pid = 0, motor_right_pid = 0;
 
         // 计算基础速度和差速修正
 
-        motor_different_pid = Motor_Different_Position_PID(sensor_err, 0);
+        //motor_different_pid = Motor_Different_Position_PID(sensor_err, 0);
+
+        sensor_err2 = Err2();
+        motor_different_pid = Motor_Different_Position_PID(sensor_err2, 0);
         
         // 差速限幅，防止转向过度
         if(motor_different_pid > 4000) motor_different_pid = 4000;

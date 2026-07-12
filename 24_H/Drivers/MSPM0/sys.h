@@ -39,6 +39,7 @@ extern volatile int16_t  base_speed;
 extern volatile uint8_t  mode;
 extern volatile uint8_t omega_flag;   //yaw角标志位   0、由A到C   1、由B到D
 extern volatile uint32_t delay_flag;
+extern volatile unsigned char Digtal;
 
 
 #endif

@@ -32,11 +32,21 @@
 
 #include "ti_msp_dl_config.h"
 #include "step_motor.h"
+#include "uart.h"
+#include "gimbal_tracker.h"
+
+static void on_center(float x, float y)
+{
+    GimbalTracker_Update(x, y);
+}
 
 int main(void)
 {
     SYSCFG_DL_init();
     step_motor_Init();
+
+    /* 电机2测试：STP=PA17, 30度/秒持续转 */
+    step_set_speed(30.0f, 2);
     step_motor_start(2);
 
     while (1) {

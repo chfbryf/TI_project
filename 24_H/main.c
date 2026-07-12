@@ -42,7 +42,15 @@
 #include "sys.h"
 #include "gyro.h"
 #include "stdint.h"
+#include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
+#include "sensor2.h"
 
+
+
+unsigned short Anolog[8]={0};
+unsigned short white[8]={3153, 3080, 2970, 3046, 3125, 3140, 2921, 2701};
+unsigned short black[8]={333, 215, 161, 189, 218, 270, 156, 158};
+unsigned short Normal[8];
 
 static volatile uint8_t Tick_angle_pid;  //循迹环时间计算标志位
 static volatile uint8_t Tick_gyro_pid;  //转向环时间计算标志位
@@ -56,6 +64,9 @@ uint8_t oled_buffer[32];
 static volatile float speed_L = 0.0f;
 static volatile float speed_R = 0.0f;
 
+volatile int16_t poss;
+
+No_MCU_Sensor sensor;
 
 
 void speed(uint8_t keyspeed) //任务函数
@@ -143,8 +154,8 @@ void change_mode(uint8_t renwu_mode)
             case 4:
             {
                 
-                if(omega_flag == 0)target_omega = 37.0;
-                if(omega_flag == 1)target_omega = 142.0;
+                if(omega_flag == 0)target_omega = 32.0;
+                if(omega_flag == 1)target_omega = 152.0;
                 gyro_flag = 1;
 
             }
@@ -169,19 +180,31 @@ int main(void)
     //初始化led
     LED4_High;
 
+
     /* Don't remove this! */
     Interrupt_Init();
 
     /* 使能循迹PID定时器中断 */
     NVIC_EnableIRQ(TIMER_xunji_pid_INST_INT_IRQN);
 
+	//根据黑白校准值初始化传感器
+	No_MCU_Ganv_Sensor_Init(&sensor,white,black);
 
+    //设置DMA搬运的起始地址
+    DL_DMA_setSrcAddr(DMA, DMA_CH0_CHAN_ID, (uint32_t) &ADC0->ULLMEM.MEMRES[0]);
+    //设置DMA搬运的目的地址
+    DL_DMA_setDestAddr(DMA, DMA_CH0_CHAN_ID, (uint32_t) &ADC_VALUE[0]);
+    //开启DMA
+    DL_DMA_enableChannel(DMA, DMA_CH0_CHAN_ID);
+    //开启ADC转换
+    DL_ADC12_startConversion(ADC12_0_INST);	
     /*OLED_ShowString(0,0,(uint8_t *)"Pitch",8);
     OLED_ShowString(0,2,(uint8_t *)" Roll",8);
     OLED_ShowString(0,4,(uint8_t *)"  Yaw",8);*/
 
+
     OLED_ShowString(0,0,(uint8_t *)"yaw",8);
-    OLED_ShowString(0,2,(uint8_t *)"mode",8);
+    OLED_ShowString(0,2,(uint8_t *)"digtal",8);
     OLED_ShowString(0,4,(uint8_t *)"renwu",8);
     OLED_ShowString(0,6,(uint8_t *)"speed",8);
 
@@ -202,7 +225,7 @@ int main(void)
         //oled显示圈数
         sprintf((char *)oled_buffer, "%f", yaw);
         OLED_ShowString(5*8,0,oled_buffer,16);
-        sprintf((char *)oled_buffer, "%d", mode);
+        sprintf((char *)oled_buffer, "%x", Digtal);
         OLED_ShowString(5*8,2,oled_buffer,16);
         sprintf((char *)oled_buffer, "%d", key.keymode);
         OLED_ShowString(5*8,4,oled_buffer,16);
@@ -211,10 +234,27 @@ int main(void)
 
 
         //串口显示速度
-        speed_L = GetSpeed_L();
+        /*speed_L = GetSpeed_L();
         speed_R = GetSpeed_R();
-        printf("%3f, %3f\n", speed_L, speed_R);
-                
+        printf("%3f, %3f\n", speed_L, speed_R);*/
+        
+            No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
+		    //获取传感器数字量结果(只有当有黑白值传入进去了之后才会有这个值！！)
+		    Digtal=Get_Digtal_For_User(&sensor);
+            //printf("Digtal %d-%d-%d-%d-%d-%d-%d-%d\r\n",(Digtal>>0)&0x01,(Digtal>>1)&0x01,(Digtal>>2)&0x01,(Digtal>>3)&0x01,(Digtal>>4)&0x01,(Digtal>>5)&0x01,(Digtal>>6)&0x01,(Digtal>>7)&0x01);
+			/*if(Get_Anolog_Value(&sensor,Anolog)){
+			printf("Anolog %d-%d-%d-%d-%d-%d-%d-%d\r\n",Anolog[0],Anolog[1],Anolog[2],Anolog[3],Anolog[4],Anolog[5],Anolog[6],Anolog[7]);
+			}
+			
+			//获取传感器归一化结果(只有当有黑白值传入进去了之后才会有这个值！！有黑白值初始化后返回1 没有返回 0)
+			if(Get_Normalize_For_User(&sensor,Normal)){
+			printf("Normalize %d-%d-%d-%d-%d-%d-%d-%d\r\n",Normal[0],Normal[1],Normal[2],Normal[3],Normal[4],Normal[5],Normal[6],Normal[7]);
+			}*/
+
+            /*Get_err2();
+            poss = Err2();
+            printf("%d", poss);*/
+  
 
         //任务代码
         renwu(key.keymode);

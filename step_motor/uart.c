@@ -111,3 +111,12 @@ static void ParseFrame(const uint8_t *data, uint16_t len)
         }
     }
 }
+
+void UART0_IRQHandler(void)
+{
+    if (DL_UART_Main_getRawInterruptStatus(UART_0_INST, DL_UART_INTERRUPT_RX) &
+        DL_UART_INTERRUPT_RX) {
+        uint8_t byte = DL_UART_Main_receiveData(UART_0_INST);
+        UartParser_RxByte(byte);
+    }
+}

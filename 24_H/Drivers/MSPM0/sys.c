@@ -8,6 +8,7 @@ volatile int16_t  base_speed;
 volatile uint8_t mode;
 volatile uint8_t omega_flag;   //yaw角标志位   0、由A到C   1、由B到D
 volatile uint32_t delay_flag;
+volatile unsigned char Digtal;
 
 /**
  * @brief printf重定向函数
