@@ -40,7 +40,7 @@ static volatile int32_t Position_err = 0;
  */
 int16_t Motor_Different_Position_PID(int Encoder, int Target)
 {
-    float Position_KP = 100, Position_KI = 0, Position_KD = 80;
+    float Position_KP =500, Position_KI = 0, Position_KD =50;
     static float Bias, Integral_bias, Pwm, Last_Bias;
     
     Bias = Encoder - Target;
