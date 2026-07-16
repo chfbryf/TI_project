@@ -43,7 +43,7 @@ uint8_t Key_GetNum(void)
 void key_work(void) 
 {
     key.keynum = Key_GetNum();
-    if(key.keynum==1){key.keyspeed++;if(key.keyspeed>3)key.keyspeed=0;}
+    if(key.keynum==1){key.keyspeed++;if(key.keyspeed>5)key.keyspeed=0;}
 	if(key.keynum==2){key.start_flag = 1;}
     if(key.keynum==3){key.keymode++;if(key.keymode>4)key.keymode=0;}
 }

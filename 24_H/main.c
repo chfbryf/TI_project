@@ -48,12 +48,13 @@
 
 
 unsigned short Anolog[8]={0};
-unsigned short white[8]={3153, 3080, 2970, 3046, 3125, 3140, 2921, 2701};
-unsigned short black[8]={333, 215, 161, 189, 218, 270, 156, 158};
+unsigned short white[8]={3221,2584,2500,2763,2716,2997,2267,2160};
+unsigned short black[8]={1311,883,814,860,929,1042,707,642};
 unsigned short Normal[8];
 
 static volatile uint8_t Tick_angle_pid;  //循迹环时间计算标志位
 static volatile uint8_t Tick_gyro_pid;  //转向环时间计算标志位
+static volatile uint8_t Tick_motor_pid; //电机环时间计算标志位
 
 static volatile uint8_t  gyro_flag; //陀螺仪标志位
 static volatile uint8_t  pid_calc_flag; //速度环标志位
@@ -72,7 +73,13 @@ No_MCU_Sensor sensor;
 void speed(uint8_t keyspeed) //任务函数
 {
 
-        if (keyspeed == 3) {
+        if(keyspeed == 5){
+            base_speed = 70;
+        }
+        else if(keyspeed == 4){
+            base_speed = 50;
+        }
+        else if (keyspeed == 3) {
             base_speed = 30;
         }
          else if (keyspeed == 2) {
@@ -172,7 +179,7 @@ int main(void)
     SYSCFG_DL_init();
     SysTick_Init();
 
-    MPU6050_Init();
+    //MPU6050_Init();
     OLED_Init();
     Encoder_Init();
     App_Motor_Init();
@@ -210,7 +217,6 @@ int main(void)
 
     while (1) 
     {
-
         key_work();
         speed(key.keyspeed);
 
@@ -234,15 +240,15 @@ int main(void)
 
 
         //串口显示速度
-        /*speed_L = GetSpeed_L();
+        speed_L = GetSpeed_L();
         speed_R = GetSpeed_R();
-        printf("%3f, %3f\n", speed_L, speed_R);*/
+        //printf("%3f, %3f, 20\n", speed_L, speed_R);
         
             No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
 		    //获取传感器数字量结果(只有当有黑白值传入进去了之后才会有这个值！！)
 		    Digtal=Get_Digtal_For_User(&sensor);
-            //printf("Digtal %d-%d-%d-%d-%d-%d-%d-%d\r\n",(Digtal>>0)&0x01,(Digtal>>1)&0x01,(Digtal>>2)&0x01,(Digtal>>3)&0x01,(Digtal>>4)&0x01,(Digtal>>5)&0x01,(Digtal>>6)&0x01,(Digtal>>7)&0x01);
-			/*if(Get_Anolog_Value(&sensor,Anolog)){
+            /*printf("Digtal %d-%d-%d-%d-%d-%d-%d-%d\r\n",(Digtal>>0)&0x01,(Digtal>>1)&0x01,(Digtal>>2)&0x01,(Digtal>>3)&0x01,(Digtal>>4)&0x01,(Digtal>>5)&0x01,(Digtal>>6)&0x01,(Digtal>>7)&0x01);
+			if(Get_Anolog_Value(&sensor,Anolog)){
 			printf("Anolog %d-%d-%d-%d-%d-%d-%d-%d\r\n",Anolog[0],Anolog[1],Anolog[2],Anolog[3],Anolog[4],Anolog[5],Anolog[6],Anolog[7]);
 			}
 			
@@ -259,16 +265,42 @@ int main(void)
         //任务代码
         /*renwu(key.keymode);
         change_mode(mode);*/
-        if(key.start_flag == 1)
+        /*if(key.start_flag == 1)
         {
             pid_calc_flag = 1;
+        }*/
+
+        if(key.start_flag == 1)
+        {
+            trace_flag = 1;
         }
 
-        base_speed = 10;
-        trace_flag = 1;
-        App_Motor_Proc(pid_calc_flag);
+        //延时执行
+        if(Tick_motor_pid >= 4)
+        {
+            App_Motor_Proc(pid_calc_flag);
+            Tick_motor_pid = 0;
+        }
 
-        //mspm0_delay_ms(500);
+        if(gyro_flag == 1)
+        {
+            if(Tick_gyro_pid >= 5)
+            {
+                GYRO_Proc(target_omega);
+                Tick_gyro_pid = 0;
+            }
+        }
+
+        if(trace_flag == 1)
+        {
+            if(Tick_angle_pid >= 6)
+            {
+                xunji_Proc();
+                Tick_angle_pid = 0;
+            }
+        }
+
+        //mspm0_delay_ms(50);
 
     }
 }
@@ -279,40 +311,12 @@ int main(void)
  */
 void TIMER_xunji_pid_INST_IRQHandler(void)
 {
-    switch (DL_TimerG_getPendingInterrupt(TIMER_xunji_pid_INST)){
-        case DL_TIMER_IIDX_ZERO:
-        {
-
-            //非阻塞延时
-            if(trace_flag == 0)
-            {
-                delay_flag++;
-            }
-
-        if(gyro_flag == 1)
-        {
-            if(Tick_gyro_pid++ >=5)
-            {
-            //陀螺仪控制pid
-            GYRO_Proc(target_omega);
-            Tick_gyro_pid = 0;
-            }
-        }
-
-        //循迹pid运算
-        if(trace_flag == 1)
-        {
-                if(Tick_angle_pid++ >= 6)  //6ms执行一次
-                {
-                    xunji_Proc();
-                    Tick_angle_pid = 0;
-                }
-            
-        }
-
-        }
-            break;
-        default:
-            break;
+    if(trace_flag == 0)
+    {
+        delay_flag++;
     }
+
+    Tick_gyro_pid++;
+    Tick_angle_pid++;
+    Tick_motor_pid++;
 }

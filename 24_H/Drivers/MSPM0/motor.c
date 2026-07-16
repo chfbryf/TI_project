@@ -4,6 +4,7 @@
 #include "sys.h"
 #include "math.h"
 #include "clock.h"
+#include "stdint.h"
 
 #define PERIOD 3200         // PWM周期（ARR值）
 
@@ -51,7 +52,8 @@ void App_PWM_Set_L(float Duty)
         AIN2_Low;
     }
 
-    DL_Timer_setCaptureCompareValue(PWM_0_INST, (uint16_t)(fabs(Duty) / 100.0f * (PERIOD)), DL_TIMER_CC_0_INDEX);
+    DL_TimerG_setCaptureCompareValue(PWM_0_INST, (uint16_t)(fabsf(Duty) / 100.0f * (PERIOD)), GPIO_PWM_0_C0_IDX);
+
 }
 
 /**
@@ -75,7 +77,8 @@ void App_PWM_Set_R(float Duty)
         BIN2_Low;
     }
 
-    DL_Timer_setCaptureCompareValue(PWM_0_INST, (uint16_t)(fabs(Duty) / 100.0f * (PERIOD)), DL_TIMER_CC_1_INDEX);
+    DL_TimerA_setCaptureCompareValue(PWM_1_INST, (uint16_t)(fabs(Duty) / 100.0f * (PERIOD)), GPIO_PWM_1_C0_IDX);
+
 }
 
 /**
@@ -105,9 +108,13 @@ void App_Motor_Init(void)
 {
     PID_Init_Simple(&pid_motor_L, 1.5, 0.7, 0);
     PID_LimitConfig(&pid_motor_L, +12, -12);
-    
+
     PID_Init_Simple(&pid_motor_R, 1.5, 0.7, 0);
     PID_LimitConfig(&pid_motor_R, +12, -12);
+
+    /* 左电机:PWM_0(TIMG8,PA1) 右电机:PWM_1(TIMA0,PA0) 初始化为PERIOD（0%占空比） */
+    DL_TimerG_setCaptureCompareValue(PWM_0_INST, PERIOD, GPIO_PWM_0_C0_IDX);
+    DL_TimerA_setCaptureCompareValue(PWM_1_INST, PERIOD, GPIO_PWM_1_C0_IDX);
 }
 
 /**

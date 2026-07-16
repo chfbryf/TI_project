@@ -166,7 +166,7 @@ void DCC_100_PWM2_INST_IRQHandler()
         case DL_TIMER_IIDX_LOAD:
         {
             if(step_remain_2 > 0)
-            {
+            { 
                 step_remain_2 --;
                 if(step_remain_2 == 0)
                 {

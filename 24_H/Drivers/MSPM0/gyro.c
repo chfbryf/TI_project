@@ -26,8 +26,8 @@ float GYRO_Control(float now,float target)
 	    Last2_bias = Last_bias;
 		Last_bias = Bias;
 
-	if(Pwm > 4000) Pwm = 4000;
-	if(Pwm < -4000) Pwm = -4000;
+	if(Pwm > 1000) Pwm = 1000;
+    if(Pwm < -1000) Pwm = -1000;
 	return Pwm;
 }
 
@@ -69,17 +69,17 @@ void GYRO_Proc(float target_yaw)
         motor_gyro_different_pid = GYRO_Control(yaw, target_yaw);
         
         // 差速限幅，防止转向过度
-        if(motor_gyro_different_pid > 4000) motor_gyro_different_pid = 4000;
-        if(motor_gyro_different_pid < -4000) motor_gyro_different_pid = -4000;
+        if(motor_gyro_different_pid > 1000) motor_gyro_different_pid = 1000;
+        if(motor_gyro_different_pid < -1000) motor_gyro_different_pid = -1000;
         
         // 计算左右电机目标速度
         motor_left_pid = motor_gyro_different_pid;         // 左电机： 差速修正
         motor_right_pid = motor_gyro_different_pid;        // 右电机： 差速修正
 
         // 将电机速度映射到-100~+100范围
-        // 基础速度约为4000对应直线速度100，转弯时速度会超过100但被限幅
-        gyro_right_pid = (int16_t)(motor_right_pid * 100.0f / 4000.0f);
-        gyro_left_pid = (int16_t)(motor_left_pid * 100.0f / 4000.0f);        
+        // 基础速度约为1000对应直线速度100，转弯时速度会超过100但被限幅
+        gyro_right_pid = (int16_t)(motor_right_pid * 100.0f / 1000.0f);
+        gyro_left_pid = (int16_t)(motor_left_pid * 100.0f / 1000.0f);        
 
         // 更新速度环目标
         GYRO_Adjust();

@@ -10,7 +10,7 @@
 static volatile int32_t   sensor_err;
 static volatile int32_t   sensor_err2;
 
-#define threshold 0.1 //阈值检测
+#define threshold 0 //阈值检测
 
 /**
  * @brief 根据灰度传感器数据计算位置误差
@@ -40,7 +40,7 @@ static volatile int32_t Position_err = 0;
  */
 int16_t Motor_Different_Position_PID(int Encoder, int Target)
 {
-    float Position_KP = 3, Position_KI = 0, Position_KD = 0;
+    float Position_KP = 100, Position_KI = 0, Position_KD = 80;
     static float Bias, Integral_bias, Pwm, Last_Bias;
     
     Bias = Encoder - Target;
@@ -50,8 +50,8 @@ int16_t Motor_Different_Position_PID(int Encoder, int Target)
     Pwm = Position_KP * Bias + Position_KI * Integral_bias + Position_KD * (Bias - Last_Bias);
 	    Last_Bias = Bias;
 
-	    if(Pwm > 4000) Pwm = 4000;
-	    if(Pwm < -4000) Pwm = -4000;
+	    if(Pwm > 3200) Pwm = 3200;
+        if(Pwm < -3200) Pwm = -3200;
 	    return Pwm;
 }
 
@@ -62,20 +62,22 @@ int16_t Motor_Different_Position_PID(int Encoder, int Target)
 void Position_Adjust(void)
 {
     // 速度阈值检测
-    float omega_L = base_speed - encoder_left_pid;
+    float omega_L = (base_speed - encoder_left_pid);
     if(omega_L >= threshold || omega_L <= -threshold)
     {
-        App_Motor_SetOmega_L(omega_L);
+        //App_Motor_SetOmega_L(omega_L);
+        App_PWM_Set_L(omega_L);
     }
     else
     {
         App_Motor_SetOmega_L(0);
     }
 
-    float omega_R = base_speed + encoder_right_pid;
+    float omega_R = (base_speed + encoder_right_pid);
     if(omega_R >= threshold || omega_R <= -threshold)
     {
-        App_Motor_SetOmega_R(omega_R);
+        //App_Motor_SetOmega_R(omega_R);
+        App_PWM_Set_R(omega_R);
     }
     else
     {
@@ -100,19 +102,19 @@ void xunji_Proc(void)
         motor_different_pid = Motor_Different_Position_PID(sensor_err2, 0);
         
         // 差速限幅，防止转向过度
-        if(motor_different_pid > 4000) motor_different_pid = 4000;
-        if(motor_different_pid < -4000) motor_different_pid = -4000;
+        if(motor_different_pid > 3200) motor_different_pid = 3200;
+        if(motor_different_pid < -3200) motor_different_pid = -3200;
         
         // 计算左右电机目标速度
         motor_left_pid = motor_different_pid;         // 左电机： 差速修正
         motor_right_pid = motor_different_pid;        // 右电机： 差速修正
 
         // 将电机速度映射到-100~+100范围
-        // 基础速度约为4000对应直线速度100，转弯时速度会超过100但被限幅
-        encoder_right_pid = (int16_t)(motor_right_pid * 100.0f / 4000.0f);
-        encoder_left_pid = (int16_t)(motor_left_pid * 100.0f / 4000.0f);        
+        // 基础速度约为1000对应直线速度100，转弯时速度会超过100但被限幅
+        encoder_right_pid = (int16_t)(motor_right_pid * 100.0f / 3200.0f);
+        encoder_left_pid = (int16_t)(motor_left_pid * 100.0f / 3200.0f);        
 
-        // 更新速度环目标
+        // 更新速度环目标c
         Position_Adjust();
 
 }
