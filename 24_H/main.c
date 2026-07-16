@@ -61,6 +61,7 @@ static volatile uint8_t  pid_calc_flag; //速度环标志位
 static volatile uint8_t  trace_flag;    //循迹环标志位
 static volatile float target_omega; //目标yaw角
 
+
 uint8_t oled_buffer[32];
 static volatile float speed_L = 0.0f;
 static volatile float speed_R = 0.0f;
@@ -205,6 +206,7 @@ int main(void)
     DL_DMA_enableChannel(DMA, DMA_CH0_CHAN_ID);
     //开启ADC转换
     DL_ADC12_startConversion(ADC12_0_INST);	
+
     /*OLED_ShowString(0,0,(uint8_t *)"Pitch",8);
     OLED_ShowString(0,2,(uint8_t *)" Roll",8);
     OLED_ShowString(0,4,(uint8_t *)"  Yaw",8);*/
@@ -275,8 +277,9 @@ int main(void)
             trace_flag = 1;
         }
 
+
         //延时执行
-        if(Tick_motor_pid >= 4)
+        /*if(Tick_motor_pid >= 4)
         {
             App_Motor_Proc(pid_calc_flag);
             Tick_motor_pid = 0;
@@ -289,7 +292,7 @@ int main(void)
                 GYRO_Proc(target_omega);
                 Tick_gyro_pid = 0;
             }
-        }
+        }*/
 
         if(trace_flag == 1)
         {
@@ -311,6 +314,7 @@ int main(void)
  */
 void TIMER_xunji_pid_INST_IRQHandler(void)
 {
+
     if(trace_flag == 0)
     {
         delay_flag++;
