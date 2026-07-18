@@ -203,11 +203,6 @@ int main(void)
 			printf("Normalize %d-%d-%d-%d-%d-%d-%d-%d\r\n",Normal[0],Normal[1],Normal[2],Normal[3],Normal[4],Normal[5],Normal[6],Normal[7]);
 			}*/
 
-App_PWM_Set_L(50);
-App_PWM_Set_R(50);
-float speed_l = GetSpeed_L();
-float speed_r = GetSpeed_R();
-printf("%.2f, %.2f\n", speed_l, speed_r);
 
         if (baohu_flag == 0){
                 switch (xia_flag) {
@@ -249,22 +244,21 @@ printf("%.2f, %.2f\n", speed_l, speed_r);
             }
         
 
-        // 变速阶段处理 
+        // 直角转弯处理 
     if (biansu_flag == 1)
     {
-        if (biansu_time < 300)
+        if (biansu_time < 500)
         {
-            base_speed -= 10;
-            if(base_speed < 0)
-            {
-                base_speed = 0;
-            }
+            App_PWM_Set_L(10);
+            App_PWM_Set_R(5);
+            key.start = 0;
         }
         else
         {
             biansu_time = 0;
             biansu_flag = 0;
             yunsu_flag = 1;
+            key.start = 1;
         }
     }
 

@@ -37,8 +37,8 @@ void Get_err2(void)
     }
 
     /* 8路灰度 0=黑线 1=白色 */
-    if      ((Digtal & 0xe0) == 0)              err2 =  -10; /* 左三全黑 → 强右修 */
-    else if ((Digtal & 0x07) == 0)              err2 =   10; /* 右三全黑 → 强左修 */
+    if      ((Digtal & 0xe0) == 0)              err2 =  0; /* 左三全黑 → 强右修 */
+    else if ((Digtal & 0x07) == 0)              err2 =   0; /* 右三全黑 → 强左修 */
     else if ((Digtal & 0x18) == 0)              err2 =    0; /* 居中 */
     else if (!(Digtal & ~0xef))                 err2 =    1; /* bit4 偏右 */
     else if (!(Digtal & ~0xf7))                 err2 =   -1; /* bit3 偏左 */
