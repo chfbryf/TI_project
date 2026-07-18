@@ -1,6 +1,5 @@
 #include "gimbal_tracker.h"
 #include "pid.h"
-#include <math.h>
 #include "step_motor.h"
 
 /* ================================================================
@@ -44,14 +43,15 @@ void GimbalTracker_Init(float dt_seconds)
 {
     g_dt = dt_seconds;
 
+    /* PID 目标设为 0："零误差"，MaixCam2 已计算好误差，直接作为反馈输入 */
     PID_Init(&g_pid_x,
              PID_X_KP_DEFAULT, PID_X_KI_DEFAULT, PID_X_KD_DEFAULT,
-             IMAGE_CX,
+             0.0f,
              PID_X_OUTPUT_LIMIT);
 
     PID_Init(&g_pid_y,
              PID_Y_KP_DEFAULT, PID_Y_KI_DEFAULT, PID_Y_KD_DEFAULT,
-             IMAGE_CY,
+             0.0f,
              PID_Y_OUTPUT_LIMIT);
 
     g_angle_x = 135.0f;
@@ -60,27 +60,29 @@ void GimbalTracker_Init(float dt_seconds)
     step_set_angle(g_angle_y, 2);
 }
 
-void GimbalTracker_Update(float target_x, float target_y)
+void GimbalTracker_Update(float error_x, float error_y, uint8_t valid)
 {
     if (!g_enabled) return;
 
-    if (target_x < 0.0f || target_y < 0.0f) {
+    /* valid=0 表示目标丢失或本帧数据不可用，保持当前位置 */
+    if (!valid) {
         return;
     }
 
-    if (target_x < 0.0f)  target_x = 0.0f;
-    if (target_x > IMAGE_WIDTH)  target_x = IMAGE_WIDTH;
-    if (target_y < 0.0f)  target_y = 0.0f;
-    if (target_y > IMAGE_HEIGHT) target_y = IMAGE_HEIGHT;
-
-    float delta_x = PID_Compute(&g_pid_x, target_x, g_dt);
-    float delta_y = PID_Compute(&g_pid_y, target_y, g_dt);
+    /**
+     * PID setpoint = 0，feedback = -error
+     * PID error = 0 - (-error) = +error
+     * 当 error_x > 0（目标偏右），PID 输出正值，云台向右转
+     * 当 error_y > 0（目标偏下），PID 输出正值，云台向下转
+     */
+    float delta_x = PID_Compute(&g_pid_x, -error_x, g_dt);
+    float delta_y = PID_Compute(&g_pid_y, -error_y, g_dt);
 
     /* 保存 PID 数据供 VOFA 读取 */
     g_pid_output_x = delta_x;
     g_pid_output_y = delta_y;
-    g_pid_error_x = g_pid_x.setpoint - target_x;
-    g_pid_error_y = g_pid_y.setpoint - target_y;
+    g_pid_error_x = error_x;
+    g_pid_error_y = error_y;
 
     g_angle_x += delta_x;
     g_angle_y -= delta_y;

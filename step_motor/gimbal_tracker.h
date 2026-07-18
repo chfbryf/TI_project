@@ -3,14 +3,6 @@
 
 #include <stdint.h>
 
-/* 图像分辨率 */
-#define IMAGE_WIDTH  640
-#define IMAGE_HEIGHT 480
-
-/* 图像中心（PID 目标点） */
-#define IMAGE_CX     (IMAGE_WIDTH / 2.0f)
-#define IMAGE_CY     (IMAGE_HEIGHT / 2.0f)
-
 /* 舵机行程 */
 #define SERVO_X_MIN  0.0f
 #define SERVO_X_MAX  270.0f
@@ -24,13 +16,15 @@
 void GimbalTracker_Init(float dt_seconds);
 
 /**
- * @brief 更新目标坐标，内部完成 PID 计算并驱动舵机
- * @param target_x  目标在图像中的 X 坐标 (0~640)
- * @param target_y  目标在图像中的 Y 坐标 (0~480)
+ * @brief 更新目标误差，内部完成 PID 计算并驱动电机
+ * @param error_x  MaixCam2 下发的 X 误差（像素）
+ * @param error_y  MaixCam2 下发的 Y 误差（像素）
+ * @param valid    1=误差有效，0=目标丢失/未识别，电机保持当前位置
  *
- * 当 (x, y) 均为 -1 时表示目标丢失，舵机保持当前位置不动。
+ * error_x > 0：目标在当前对象右侧，电机需向右转
+ * error_y > 0：目标在当前对象下方，电机需向下转
  */
-void GimbalTracker_Update(float target_x, float target_y);
+void GimbalTracker_Update(float error_x, float error_y, uint8_t valid);
 
 /**
  * @brief 获取当前舵机角度

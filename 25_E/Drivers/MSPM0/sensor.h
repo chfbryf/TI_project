@@ -10,6 +10,6 @@
 #define R2          DL_GPIO_readPins(Sensor_P5_PORT,Sensor_P5_PIN)
 
 void Get_error(void);
-int32_t Error(void);
+void xunji_Proc(void);
 
 #endif

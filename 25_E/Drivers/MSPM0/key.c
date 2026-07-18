@@ -42,8 +42,8 @@ uint8_t Key_GetNum(void)
  */
 void key_work(void) 
 {
-    keynum = Key_GetNum();
-    if(keynum==1){keyspeed++;if(keyspeed>3)keyspeed=0;}
-	if(keynum==2){start_flag = 1;}
-    if(keynum==3){keyquan++;if(keyquan>5)keyquan=0;}
+    key.keynum = Key_GetNum();
+    if(key.keynum==1){key.keyspeed++;if(key.keyspeed>5)key.keyspeed=0;}
+	if(key.keynum==2){key.start = 1;}
+    if(key.keynum==3){key.quan++;if(key.quan>5)key.quan=0;}
 }

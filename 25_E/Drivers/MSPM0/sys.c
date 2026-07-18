@@ -2,12 +2,13 @@
 #include "stdio.h"
 
 /* 跨模块全局变量定义 */
-volatile uint8_t  keyspeed;
-volatile uint8_t  keyquan;
-volatile uint8_t  keynum;
-volatile int16_t  base_speed;
-volatile uint8_t  start_flag;
 
+volatile int16_t  base_speed;
+
+volatile uint8_t mode;
+volatile uint8_t omega_flag;   //yaw角标志位   0、由A到C   1、由B到D
+volatile uint32_t delay_flag;
+volatile unsigned char Digtal;
 
 /**
  * @brief printf重定向函数

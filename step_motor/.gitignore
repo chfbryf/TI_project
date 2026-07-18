@@ -1,0 +1,32 @@
+# CCS Build Output
+Debug/
+Release/
+*.out
+*.hex
+*.bin
+*.obj
+*.o
+
+# CCS IDE Settings
+.settings/
+.cproject
+.project
+.ccsproject
+.clangd
+
+# Target Configs (usually auto-generated)
+# targetConfigs/
+
+# Trae IDE
+.trae/
+
+# OS Files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editor Backups
+*~
+*.bak
+*.swp
+*.swo

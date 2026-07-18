@@ -1,3 +1,6 @@
+#ifndef SYS_H_
+#define SYS_H_
+
 #include "ti_msp_dl_config.h"
 
 #define AIN1_High       DL_GPIO_setPins(DIR_AIN1_PORT, DIR_AIN1_PIN)
@@ -19,8 +22,23 @@
 #define BUZZ_Low         DL_GPIO_clearPins(BUZZER_PORT, BUZZER_buzzer_PIN)
 
 /* 跨模块全局变量声明 */
-extern volatile uint8_t  keyspeed;
-extern volatile uint8_t  keyquan;
-extern volatile uint8_t  keynum;
+typedef struct{
+
+volatile uint8_t  keyspeed;
+volatile uint8_t  quan;
+volatile uint8_t  keynum;
+volatile uint8_t  start;
+
+} key_t;
+
+key_t key;
+
+extern key_t key;
+
 extern volatile int16_t  base_speed;
-extern volatile uint8_t  start_flag;
+extern volatile uint8_t  quanshu;
+extern volatile uint32_t delay_flag;
+extern volatile unsigned char Digtal;
+
+
+#endif

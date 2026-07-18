@@ -13,6 +13,7 @@ int mspm0_delay_ms(unsigned long num_ms);
 int mspm0_get_clock_ms(unsigned long *count);
 int mspm0_get_clock_us(unsigned long *count);
 uint64_t mspm0_get_clock_us_now(void);
+void mspm0_delay_us(unsigned long num_us);
 void SysTick_Init(void);
 
 

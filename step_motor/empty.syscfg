@@ -17,6 +17,7 @@ const PWM2   = PWM.addInstance();
 const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
 const UART   = scripting.addModule("/ti/driverlib/UART", {}, false);
 const UART1  = UART.addInstance();
+const UART2  = UART.addInstance();
 
 /**
  * Write custom configuration values to the imported modules.
@@ -88,11 +89,19 @@ SYSCTL.clockTreeEn           = true;
 UART1.$name                    = "UART_0";
 UART1.targetBaudRate           = 115200;
 UART1.enabledInterrupts        = ["RX"];
-UART1.peripheral.$assign       = "UART0";
-UART1.peripheral.rxPin.$assign = "PA11";
-UART1.peripheral.txPin.$assign = "PA10";
+UART1.peripheral.$assign       = "UART1";
+UART1.peripheral.rxPin.$assign = "PA18";
+UART1.peripheral.txPin.$assign = "PA17";
 UART1.txPinConfig.$name        = "ti_driverlib_gpio_GPIOPinGeneric2";
 UART1.rxPinConfig.$name        = "ti_driverlib_gpio_GPIOPinGeneric3";
+
+UART2.$name                    = "UART_1";
+UART2.targetBaudRate           = 115200;
+UART2.peripheral.$assign       = "UART0";
+UART2.peripheral.rxPin.$assign = "PA11";
+UART2.peripheral.txPin.$assign = "PA10";
+UART2.txPinConfig.$name        = "ti_driverlib_gpio_GPIOPinGeneric4";
+UART2.rxPinConfig.$name        = "ti_driverlib_gpio_GPIOPinGeneric5";
 
 /**
  * Pinmux solution for unlocked pins/peripherals. This ensures that minor changes to the automatic solver in a future
@@ -107,5 +116,5 @@ GPIO1.associatedPins[1].pin.$suggestSolution       = "PA15";
 Board.peripheral.$suggestSolution                  = "DEBUGSS";
 Board.peripheral.swclkPin.$suggestSolution         = "PA20";
 Board.peripheral.swdioPin.$suggestSolution         = "PA19";
-PWM1.peripheral.ccp0Pin.$suggestSolution           = "PA17";
+PWM1.peripheral.ccp0Pin.$suggestSolution           = "PA23";
 PWM2.peripheral.ccp0Pin.$suggestSolution           = "PA21";

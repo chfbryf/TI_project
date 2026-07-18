@@ -13,20 +13,16 @@ static volatile uint16_t rx_tail = 0;
 static uint8_t frame_buf[UART_RX_BUF_SIZE];
 static uint16_t frame_len = 0;
 
-static CenterCallback center_callback = NULL;
-static BlobCallback blob_callback = NULL;
-static CircleCallback circle_callback = NULL;
+static AIMCallback aim_callback = NULL;
+static CircleDoneCallback circle_done_callback = NULL;
 
-/* 内部函数：提取并解析一帧 */
+/* 内部函数 */
 static void ParseFrame(const uint8_t *data, uint16_t len);
 
-void UartParser_Init(CenterCallback center_cb,
-                     BlobCallback blob_cb,
-                     CircleCallback circle_cb)
+void UartParser_Init(AIMCallback aim_cb, CircleDoneCallback circle_done_cb)
 {
-    center_callback = center_cb;
-    blob_callback = blob_cb;
-    circle_callback = circle_cb;
+    aim_callback = aim_cb;
+    circle_done_callback = circle_done_cb;
 
     /* 启动 UART 接收中断 */
     DL_UART_enableInterrupt(UART_0_INST, DL_UART_INTERRUPT_RX);
@@ -53,7 +49,7 @@ void UartParser_Process(void)
                 ParseFrame(frame_buf, frame_len);
                 frame_len = 0;
             }
-        } else {
+        } else if (byte != '\r') {
             if (frame_len < UART_RX_BUF_SIZE - 1) {
                 frame_buf[frame_len++] = byte;
             } else {
@@ -65,50 +61,58 @@ void UartParser_Process(void)
 
 static void ParseFrame(const uint8_t *data, uint16_t len)
 {
-    if (len < 3) return;
+    if (len < 4) return;
 
-    // 处理 C:[x,y]
-    if (data[0] == 'C' && data[1] == ':') {
-        float x, y;
-        if (sscanf((const char *)data, "C:[%f,%f]", &x, &y) == 2) {
-            if (center_callback) {
-                center_callback(x, y);
+    /**
+     * AIM,valid,mode,point_index,point_count,point_locked,error_x,error_y,
+     *     target_x,target_y,laser_x,laser_y,rect_center_x,rect_center_y,rect_confidence
+     * 共 15 个字段
+     */
+    if (data[0] == 'A' && data[1] == 'I' && data[2] == 'M' && data[3] == ',') {
+        int valid_i, point_index_i, point_count_i, point_locked_i;
+        float error_x, error_y, target_x, target_y;
+        float laser_x, laser_y, rect_center_x, rect_center_y, rect_confidence;
+        char mode[16];
+
+        int n = sscanf((const char *)data,
+            "AIM,%d,%15[^,],%d,%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f",
+            &valid_i, mode, &point_index_i, &point_count_i, &point_locked_i,
+            &error_x, &error_y,
+            &target_x, &target_y,
+            &laser_x, &laser_y,
+            &rect_center_x, &rect_center_y,
+            &rect_confidence);
+
+        if (n == 15 && aim_callback) {
+            aim_callback((uint8_t)valid_i, mode,
+                         point_index_i, point_count_i, point_locked_i,
+                         error_x, error_y,
+                         target_x, target_y,
+                         laser_x, laser_y,
+                         rect_center_x, rect_center_y,
+                         rect_confidence);
+        }
+    }
+    /* CIRCLE,DONE,<point_count> */
+    else if (data[0] == 'C' && data[1] == 'I' && data[2] == 'R' && data[3] == 'C'
+             && data[4] == 'L' && data[5] == 'E' && data[6] == ',') {
+        int point_count;
+        if (sscanf((const char *)data, "CIRCLE,DONE,%d", &point_count) == 1) {
+            if (circle_done_callback) {
+                circle_done_callback(point_count);
             }
         }
     }
-    // 处理 B:[x,y]  (新增)
-    else if (data[0] == 'B' && data[1] == ':') {
-        float x, y;
-        if (sscanf((const char *)data, "B:[%f,%f]", &x, &y) == 2) {
-            if (blob_callback) {
-                blob_callback(x, y);
-            }
-        }
-    }
-    // 处理 P:[x0:y0,x1:y1,...]
-    else if (data[0] == 'P' && data[1] == ':') {
-        uint16_t x_arr[24];
-        uint16_t y_arr[24];
-        uint8_t count = 0;
+}
 
-        const char *ptr = (const char *)data + 2;  // 跳过 "P:"
-        if (*ptr == '[') ptr++;
-        while (*ptr && count < 24) {
-            unsigned int x, y;
-            if (sscanf(ptr, "%u:%u", &x, &y) == 2) {
-                x_arr[count] = (uint16_t)x;
-                y_arr[count] = (uint16_t)y;
-                count++;
-                ptr = strchr(ptr, ',');
-                if (ptr) ptr++;
-                else break;
-            } else {
-                break;
-            }
-        }
-        if (count > 0 && circle_callback) {
-            circle_callback(x_arr, y_arr, count);
-        }
+/**
+ * @brief 通过 UART 发送字符串（阻塞）
+ */
+void UartParser_SendString(const char *str)
+{
+    while (*str) {
+        DL_UART_Main_transmitDataBlocking(UART_0_INST, (uint8_t)*str);
+        str++;
     }
 }
 
