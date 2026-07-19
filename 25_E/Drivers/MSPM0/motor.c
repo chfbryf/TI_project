@@ -77,7 +77,7 @@ void App_PWM_Set_R(float Duty)
         BIN2_Low;
     }
 
-    DL_TimerA_setCaptureCompareValue(PWM_1_INST, (uint16_t)(fabs(Duty) / 100.0f * (PERIOD)), GPIO_PWM_1_C0_IDX);
+    DL_TimerG_setCaptureCompareValue(PWM_0_INST, (uint16_t)(fabsf(Duty) / 100.0f * PERIOD), GPIO_PWM_0_C1_IDX);
 
 }
 
@@ -112,9 +112,9 @@ void App_Motor_Init(void)
     PID_Init_Simple(&pid_motor_R, 1.5, 0.7, 0);
     PID_LimitConfig(&pid_motor_R, +12, -12);
 
-    /* 左电机:PWM_0(TIMG8,PA1) 右电机:PWM_1(TIMA0,PA0) 初始化为PERIOD（0%占空比） */
+    /* 双电机共用一个定时器 PWM_0(TIMG8): C0=PA1(左), C1=PA0(右) 初始化为0%占空比 */
     DL_TimerG_setCaptureCompareValue(PWM_0_INST, PERIOD, GPIO_PWM_0_C0_IDX);
-    DL_TimerA_setCaptureCompareValue(PWM_1_INST, PERIOD, GPIO_PWM_1_C0_IDX);
+    DL_TimerG_setCaptureCompareValue(PWM_0_INST, PERIOD, GPIO_PWM_0_C1_IDX);
 }
 
 /**

@@ -247,9 +247,19 @@ int main(void)
         // 直角转弯处理 
     if (biansu_flag == 1)
     {
-        if (biansu_time < 500)
+        if (biansu_time < 300)
         {
-            App_PWM_Set_L(10);
+            // 0.3s内从当前速度渐变到目标值
+            float progress = (float)biansu_time / 300.0f;
+            float duty_L = base_speed + (15.0f - base_speed) * progress;
+            float duty_R = base_speed + (5.0f - base_speed) * progress;
+            App_PWM_Set_L(duty_L);
+            App_PWM_Set_R(duty_R);
+            key.start = 0;
+        }
+        else if (biansu_time < 1500)
+        {
+            App_PWM_Set_L(15);
             App_PWM_Set_R(5);
             key.start = 0;
         }
