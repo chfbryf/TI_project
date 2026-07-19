@@ -11,5 +11,6 @@
 
 void Get_error(void);
 void xunji_Proc(void);
+void Motor_PID_Reset(void);
 
 #endif

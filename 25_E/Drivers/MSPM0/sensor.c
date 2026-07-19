@@ -12,6 +12,23 @@ static volatile int32_t   sensor_err2;
 
 static volatile int16_t motor_different_pid = 0, encoder_left_pid = 0, encoder_right_pid = 0;  // PID计算输出值
 
+// PID静态变量，供复位使用
+static float PID_Bias, PID_Integral_bias, PID_Pwm, PID_Last_Bias;
+
+/**
+ * @brief 复位差速PID状态，转弯退出时调用，清除积分残留
+ */
+void Motor_PID_Reset(void)
+{
+    PID_Bias = 0;
+    PID_Integral_bias = 0;
+    PID_Pwm = 0;
+    PID_Last_Bias = 0;
+    motor_different_pid = 0;
+    encoder_left_pid = 0;
+    encoder_right_pid = 0;
+}
+
 /**
  * @brief 差速位置模式PID控制器
  * 
@@ -21,20 +38,19 @@ static volatile int16_t motor_different_pid = 0, encoder_left_pid = 0, encoder_r
  */
 int16_t Motor_Different_Position_PID(int Encoder, int Target)
 {
-    float Position_KP =300, Position_KI = 0.4, Position_KD =365;
-    static float Bias, Integral_bias, Pwm, Last_Bias;
+    float Position_KP =200, Position_KI = 0.4, Position_KD =365;
     
-    Bias = Encoder - Target;
-    Integral_bias += Bias;
-    if(Bias == 0) Integral_bias = 0;
+    PID_Bias = Encoder - Target;
+    PID_Integral_bias += PID_Bias;
+    if(PID_Bias == 0) PID_Integral_bias = 0;
     
-    Pwm = Position_KP * Bias + Position_KI * Integral_bias + Position_KD * (Bias - Last_Bias);
-	    Last_Bias = Bias;
+    PID_Pwm = Position_KP * PID_Bias + Position_KI * PID_Integral_bias + Position_KD * (PID_Bias - PID_Last_Bias);
+	    PID_Last_Bias = PID_Bias;
 
-	    if(Pwm > 3200) Pwm = 3200;
-        if(Pwm < -3200) Pwm = -3200;    
+	    if(PID_Pwm > 3200) PID_Pwm = 3200;
+        if(PID_Pwm < -3200) PID_Pwm = -3200;    
         
-	    return Pwm;
+	    return PID_Pwm;
 }
 
 

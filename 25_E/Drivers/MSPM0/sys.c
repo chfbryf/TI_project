@@ -3,6 +3,7 @@
 
 /* 跨模块全局变量定义 */
 
+key_t key;
 volatile int16_t  base_speed;
 
 volatile uint8_t mode;

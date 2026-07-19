@@ -31,8 +31,6 @@ volatile uint8_t  start;
 
 } key_t;
 
-key_t key;
-
 extern key_t key;
 
 extern volatile int16_t  base_speed;
