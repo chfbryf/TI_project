@@ -1,7 +1,4 @@
 #include "uart.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include "ti_msp_dl_config.h"
 
 /* 环形缓冲区 */
@@ -24,6 +21,9 @@ void UartParser_Init(AIMCallback aim_cb, CircleDoneCallback circle_done_cb)
     aim_callback = aim_cb;
     circle_done_callback = circle_done_cb;
 
+    /* 使能 NVIC，SysConfig 生成的 init 缺少这一步 */
+    NVIC_EnableIRQ(UART_0_INST_INT_IRQN);
+
     /* 启动 UART 接收中断 */
     DL_UART_enableInterrupt(UART_0_INST, DL_UART_INTERRUPT_RX);
 }
@@ -35,6 +35,7 @@ void UartParser_RxByte(uint8_t byte)
         rx_buf[rx_head] = byte;
         rx_head = next;
     }
+    /* else: 缓冲区满，丢弃字节 */
 }
 
 void UartParser_Process(void)
@@ -83,7 +84,7 @@ static void ParseFrame(const uint8_t *data, uint16_t len)
             &rect_center_x, &rect_center_y,
             &rect_confidence);
 
-        if (n == 15 && aim_callback) {
+        if (n == 14 && aim_callback) {
             aim_callback((uint8_t)valid_i, mode,
                          point_index_i, point_count_i, point_locked_i,
                          error_x, error_y,
@@ -106,17 +107,25 @@ static void ParseFrame(const uint8_t *data, uint16_t len)
 }
 
 /**
- * @brief 通过 UART 发送字符串（阻塞）
+ * @brief 通过 UART 发送字符串
  */
 void UartParser_SendString(const char *str)
 {
     while (*str) {
-        DL_UART_Main_transmitDataBlocking(UART_0_INST, (uint8_t)*str);
+        /* 等 TX FIFO 有空位（超时保护） */
+        uint32_t t = 100000;
+        while (DL_UART_isTXFIFOFull(UART_0_INST) && --t);
+        if (t == 0) return;
+
+        DL_UART_transmitData(UART_0_INST, (uint8_t)*str);
         str++;
+
+        /* 等移位寄存器完成（115200bps，每字节约 87us） */
+        for (volatile uint32_t d = 0; d < 8000; d++);
     }
 }
 
-void UART0_IRQHandler(void)
+void UART_0_INST_IRQHandler(void)
 {
     if (DL_UART_Main_getRawInterruptStatus(UART_0_INST, DL_UART_INTERRUPT_RX) &
         DL_UART_INTERRUPT_RX) {

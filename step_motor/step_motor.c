@@ -18,6 +18,8 @@ GND：共地
 
 uint32_t step_remain_1 = 0;
 uint32_t step_remain_2 = 0;
+volatile uint32_t isr_cnt_1 = 0;
+volatile uint32_t isr_cnt_2 = 0;
 
 
 //
@@ -141,6 +143,34 @@ void step_set_speed(float speed, uint8_t stepper_id)
 }
 
 
+//
+//@简介：步进电机相对角度旋转
+//@参数：degrees-旋转角度（度）
+//@参数：direction-方向,0-反转(左/下)，1-正转(右/上)
+//@参数：stepper_id-电机编号
+//
+void step_rotate_by(float degrees, uint8_t direction, uint8_t stepper_id)
+{
+    step_motor_dir_set(direction, stepper_id);
+
+    if (stepper_id == 1) {
+        uint8_t was_stopped = (step_remain_1 == 0);
+        step_remain_1 = (uint32_t)(degrees / 0.05625f);
+        /* 只在电机停止时才重新启动，运行中只更新步数避免重置计数器 */
+        if (was_stopped) {
+            step_set_speed(30.0f, 1);
+            step_motor_start(1);
+        }
+    } else if (stepper_id == 2) {
+        uint8_t was_stopped = (step_remain_2 == 0);
+        step_remain_2 = (uint32_t)(degrees / 0.05625f);
+        if (was_stopped) {
+            step_set_speed(30.0f, 2);
+            step_motor_start(2);
+        }
+    }
+}
+
 void step_set_angle(float angle, uint8_t stepper_id)
 {
     if(stepper_id == 1)
@@ -161,46 +191,32 @@ void step_set_angle(float angle, uint8_t stepper_id)
 
 void DCC_100_PWM2_INST_IRQHandler()
 {
-    switch (DL_Timer_getPendingInterrupt(DCC_100_PWM2_INST))
-    {
-        case DL_TIMER_IIDX_LOAD:
-        {
-            if(step_remain_2 > 0)
-            {
-                step_remain_2 --;
-                if(step_remain_2 == 0)
-                {
-                    step_motor_stop(2);
-                }
+    /* 清除所有挂起中断，每次中断计一个步数 */
+    uint32_t iidx;
+    while ((iidx = DL_Timer_getPendingInterrupt(DCC_100_PWM2_INST)) != 0) {
+        isr_cnt_2++;
+        if (step_remain_2 > 0) {
+            step_remain_2--;
+            if (step_remain_2 == 0) {
+                step_motor_stop(2);
             }
-            break;
         }
-
-    default:
-    break;
     }
 }
 
     
 void DCC_100_PWM1_INST_IRQHandler()
 {
-    switch (DL_Timer_getPendingInterrupt(DCC_100_PWM1_INST))
-    {
-        case DL_TIMER_IIDX_LOAD:
-        {
-            if(step_remain_1 > 0)
-            {
-                step_remain_1 --;
-                if(step_remain_1 == 0)
-                {
-                    step_motor_stop(1);
-                }
+    /* 清除所有挂起中断，每次中断计一个步数 */
+    uint32_t iidx;
+    while ((iidx = DL_Timer_getPendingInterrupt(DCC_100_PWM1_INST)) != 0) {
+        isr_cnt_1++;
+        if (step_remain_1 > 0) {
+            step_remain_1--;
+            if (step_remain_1 == 0) {
+                step_motor_stop(1);
             }
-            break;
         }
-
-    default:
-    break;
     }
 }
 

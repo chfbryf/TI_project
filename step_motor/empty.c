@@ -30,11 +30,19 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
 #include "ti_msp_dl_config.h"
 #include "step_motor.h"
 #include "uart.h"
 #include "gimbal_tracker.h"
+#include <stdio.h>
+
+/* 系统毫秒计数器，由 SysTick 中断维护，供 gimbal_tracker 做动态 dt 测量 */
+volatile uint32_t g_sys_tick_ms = 0;
+
+void SysTick_Handler(void)
+{
+    g_sys_tick_ms++;
+}
 
 static void on_aim(uint8_t valid, const char *mode,
                    int point_index, int point_count, int point_locked,
@@ -44,46 +52,54 @@ static void on_aim(uint8_t valid, const char *mode,
                    float rect_center_x, float rect_center_y,
                    float rect_confidence)
 {
-    /* 将 AIM 误差直接传给云台追踪器 */
+    (void)mode;
+    (void)point_index;
+    (void)point_count;
+    (void)point_locked;
+    (void)target_x;
+    (void)target_y;
+    (void)laser_x;
+    (void)laser_y;
+    (void)rect_center_x;
+    (void)rect_center_y;
+    (void)rect_confidence;
+
     GimbalTracker_Update(error_x, error_y, valid);
 }
 
 static void on_circle_done(int point_count)
 {
-    /* 画圆完成，可在此处添加完成处理逻辑 */
     (void)point_count;
 }
 
 int main(void)
 {
     SYSCFG_DL_init();
+
     step_motor_Init();
-
-    /* 初始化云台追踪器（PID setpoint=0，初始角度 135°/90°） */
     GimbalTracker_Init(0.05f);
-
-    /* 注册串口回调 */
     UartParser_Init(on_aim, on_circle_done);
 
-    /* 启动：通知 MaixCam2 进入 CENTER 模式（矩形居中） */
+    /* 配置 SysTick 产生 1ms 中断，用于动态测量帧间隔 dt */
+    SysTick_Config(32000000 / 1000);
+
+    /* 发送指令给摄像头 */
     UartParser_SendString("MODE,CENTER\n");
 
     while (1) {
-        /* 持续处理 MaixCam2 下发的 AIM 数据 */
         UartParser_Process();
     }
 }
-
-
-
-
 /**
  * @brief printf重定向函数
  */
 int __io_putchar(int ch)
 {
-    while (DL_UART_isBusy(UART_1_INST) == true);
-    DL_UART_Main_transmitData(UART_1_INST, ch);
+    uint32_t t = 100000;
+    while (DL_UART_isTXFIFOFull(UART_1_INST) && --t);
+    if (t == 0) return ch;
+    DL_UART_transmitData(UART_1_INST, (uint8_t)ch);
+    for (volatile uint32_t d = 0; d < 8000; d++);
     return ch;
 }
 

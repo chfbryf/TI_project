@@ -1,6 +1,7 @@
 #include "gimbal_tracker.h"
 #include "pid.h"
 #include "step_motor.h"
+#include <math.h>
 
 /* ================================================================
  *  PID 默认参数（可运行时通过 VOFA 下发修改）
@@ -17,6 +18,27 @@
 #define PID_Y_KI_DEFAULT      0.001f
 #define PID_Y_KD_DEFAULT      0.001f
 #define PID_Y_OUTPUT_LIMIT    15.0f
+
+/* ================================================================
+ *  速度控制参数
+ * ================================================================
+ *  PID 输出 delta（度/帧）→ 电机角速度 speed = delta / dt
+ *  SPEED_MIN: 低于此速度认为已对准，电机停转。降到 0.5°/s，
+ *             对应约 1 像素误差（含 P 项），实现精细化跟踪。
+ *  SPEED_MAX: 最高转速，提高到 100°/s，增大 PID 输出的有效范围，
+ *             减少"PID 算细了但速度一律封顶"的二值化问题。
+ */
+#define SPEED_MAX  100.0f
+#define SPEED_MIN  0.5f
+
+/*
+ * valid 去抖：连续丢帧 N 次才确认目标确实丢失。
+ * 避免单帧 valid=0 导致电机频繁启停，看起来像"不响应"。
+ */
+#define VALID_LOST_THRESHOLD  3
+
+/* 系统毫秒计数器（由 SysTick 中断维护） */
+extern volatile uint32_t g_sys_tick_ms;
 
 /* ================================================================
  *  内部状态
@@ -54,20 +76,46 @@ void GimbalTracker_Init(float dt_seconds)
              0.0f,
              PID_Y_OUTPUT_LIMIT);
 
-    g_angle_x = 135.0f;
+    g_angle_x = 90.0f;
     g_angle_y = 90.0f;
-    step_set_angle(g_angle_x, 1);
-    step_set_angle(g_angle_y, 2);
 }
 
 void GimbalTracker_Update(float error_x, float error_y, uint8_t valid)
 {
-    if (!g_enabled) return;
+    static uint8_t motor1_running = 0;
+    static uint8_t motor2_running = 0;
+    static uint32_t last_tick = 0;
+    static uint8_t valid_lost_cnt = 0;
 
-    /* valid=0 表示目标丢失或本帧数据不可用，保持当前位置 */
-    if (!valid) {
+    if (!g_enabled) {
         return;
     }
+
+    /*
+     * 动态计算帧间隔 dt，替代硬编码的 g_dt。
+     * 首次调用时 last_tick=0，dt 会很大，用 g_dt 兜底。
+     */
+    uint32_t now = g_sys_tick_ms;
+    float dt = (float)(now - last_tick) / 1000.0f;
+    if (dt < 0.005f || dt > 0.5f) {
+        dt = g_dt;   /* 首帧或异常间隔，用初始化默认值 */
+    }
+    last_tick = now;
+
+    /*
+     * valid 去抖：连续丢帧 VALID_LOST_THRESHOLD 次才确认目标丢失。
+     * 避免摄像头偶发 valid=0 导致电机频繁启停。
+     */
+    if (!valid) {
+        valid_lost_cnt++;
+        if (valid_lost_cnt < VALID_LOST_THRESHOLD) {
+            return;  /* 暂不停机，等待确认 */
+        }
+        if (motor1_running) { step_motor_stop(1); motor1_running = 0; }
+        if (motor2_running) { step_motor_stop(2); motor2_running = 0; }
+        return;
+    }
+    valid_lost_cnt = 0;
 
     /**
      * PID setpoint = 0，feedback = -error
@@ -75,8 +123,8 @@ void GimbalTracker_Update(float error_x, float error_y, uint8_t valid)
      * 当 error_x > 0（目标偏右），PID 输出正值，云台向右转
      * 当 error_y > 0（目标偏下），PID 输出正值，云台向下转
      */
-    float delta_x = PID_Compute(&g_pid_x, -error_x, g_dt);
-    float delta_y = PID_Compute(&g_pid_y, -error_y, g_dt);
+    float delta_x = PID_Compute(&g_pid_x, -error_x, dt);
+    float delta_y = PID_Compute(&g_pid_y, -error_y, dt);
 
     /* 保存 PID 数据供 VOFA 读取 */
     g_pid_output_x = delta_x;
@@ -87,13 +135,54 @@ void GimbalTracker_Update(float error_x, float error_y, uint8_t valid)
     g_angle_x += delta_x;
     g_angle_y -= delta_y;
 
+    /* 角度限幅 */
     if (g_angle_x < SERVO_X_MIN) g_angle_x = SERVO_X_MIN;
     if (g_angle_x > SERVO_X_MAX) g_angle_x = SERVO_X_MAX;
     if (g_angle_y < SERVO_Y_MIN) g_angle_y = SERVO_Y_MIN;
     if (g_angle_y > SERVO_Y_MAX) g_angle_y = SERVO_Y_MAX;
 
-    step_set_angle(g_angle_x, 1);
-    step_set_angle(g_angle_y, 2);
+    /*
+     * 连续速度控制：将 PID 输出的角度增量转为电机转速
+     * speed = delta / dt，限制在 SPEED_MIN ~ SPEED_MAX 度/秒
+     */
+
+    /* 电机1（X轴） */
+    float speed_x = fabsf(delta_x) / dt;
+    if (speed_x > SPEED_MAX) speed_x = SPEED_MAX;
+
+    if (speed_x > SPEED_MIN) {
+        step_motor_dir_set(delta_x > 0 ? 1 : 0, 1);
+        step_remain_1 = 0;  /* 连续运行 */
+        step_set_speed(speed_x, 1);
+        if (!motor1_running) {
+            step_motor_start(1);
+            motor1_running = 1;
+        }
+    } else {
+        if (motor1_running) {
+            step_motor_stop(1);
+            motor1_running = 0;
+        }
+    }
+
+    /* 电机2（Y轴） */
+    float speed_y = fabsf(delta_y) / dt;
+    if (speed_y > SPEED_MAX) speed_y = SPEED_MAX;
+
+    if (speed_y > SPEED_MIN) {
+        step_motor_dir_set(delta_y > 0 ? 0 : 1, 2);
+        step_remain_2 = 0;  /* 连续运行 */
+        step_set_speed(speed_y, 2);
+        if (!motor2_running) {
+            step_motor_start(2);
+            motor2_running = 1;
+        }
+    } else {
+        if (motor2_running) {
+            step_motor_stop(2);
+            motor2_running = 0;
+        }
+    }
 }
 
 float GimbalTracker_GetAngleX(void)
