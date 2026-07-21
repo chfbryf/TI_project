@@ -4,7 +4,7 @@
 int16_t err2;
 volatile uint8_t black_detected;
 
-#define BLACK_DEBOUNCE_MS  50
+#define BLACK_DEBOUNCE_MS  30
 
 void Get_err2(void)
 {
@@ -36,19 +36,24 @@ void Get_err2(void)
         return;
     }
 
-    /* 8路灰度 0=黑线 1=白色 */
-    if      ((Digtal & 0xe0) == 0)              err2 =  -5; /* 左三全黑 → 强右修 */
-    else if ((Digtal & 0x07) == 0)              err2 =   5; /* 右三全黑 → 强左修 */
-    else if ((Digtal & 0x18) == 0)              err2 =    0; /* 居中 */
-    else if (!(Digtal & ~0xef))                 err2 =    1; /* bit4 偏右 */
-    else if (!(Digtal & ~0xf7))                 err2 =   -1; /* bit3 偏左 */
-    else if (!(Digtal & ~0xfb))                 err2 =  2;
-    else if (!(Digtal & ~0xfd))                 err2 =  3;
-    else if (!(Digtal & ~0xfe))                 err2 =  4;
-    else if (!(Digtal & ~0xdf))                 err2 = -2;
-    else if (!(Digtal & ~0xbf))                 err2 = -3;
-    else if (!(Digtal & ~0x7f))                 err2 = -4;
-    else                                        err2 =  0;
+    /* 加权质心法：8路灰度的权重映射
+     * bit7(左) → -7, bit6 → -5, bit5 → -3, bit4 → -1,
+     * bit3 → +1, bit2 → +3, bit1 → +5, bit0(右) → +7
+     * bit=0 表示见到黑线，对权重求和取平均 */
+    {
+        static const int8_t weight[8] = {7, 5, 3, 1, -1, -3, -5, -7};
+        int16_t sum = 0;
+        int8_t  cnt = 0;
+
+        for (uint8_t i = 0; i < 8; i++) {
+            if (!(Digtal & (1 << i))) {   /* bit=0 → 黑线 */
+                sum += weight[i];
+                cnt++;
+            }
+        }
+
+        err2 = (cnt > 0) ? (sum / cnt) : 0;
+    }
 }
 
 int16_t Err2(void)

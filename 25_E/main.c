@@ -42,11 +42,11 @@
 #include "sensor2.h"
 #include "speed_ctrl.h"
 
-
+#define SPEED_TEST 1   /* 速度环测试模式：1=启用, 0=禁用 */
 
 unsigned short Anolog[8]={0};
-unsigned short white[8]={3221,2584,2500,2763,2716,2997,2267,2160};
-unsigned short black[8]={1311,883,814,860,929,1042,707,642};
+unsigned short white[8]={3129,2516,2376,2634,2745,2947,2290,2247};
+unsigned short black[8]={730,465,358,402,370,463,279,291};
 unsigned short Normal[8];
 
 static volatile uint8_t Tick_angle_pid;  //循迹环时间计算标志位
@@ -63,35 +63,31 @@ static volatile TurnState turn_state = TURN_IDLE;
 static volatile uint32_t turn_timer;     // 转弯阶段计时(ms)
 static volatile uint32_t baohu_time;     // 转弯保护计时(ms)
 static volatile float save_base_speed;   // 转弯前速度，用于恢复
+static volatile uint8_t baohu_flag;
 
-static volatile uint8_t baohu_flag; 
 volatile uint8_t quanshu;
 static volatile uint8_t m0; //转弯计数
-
-
-
+static uint8_t last_start = 0;  // 用于检测 key.start 上升沿
+volatile uint32_t test_ms = 0;  // 测试用1ms计数器，在TIMER_xunji_pid ISR中自增
 uint8_t oled_buffer[32];
-
-
 No_MCU_Sensor sensor;
 
-
-void speed(uint8_t keyspeed) //任务函数，mm/s（对标10_DC_MOTOR_PID_3）
+void speed(uint8_t keyspeed) //任务函数，mm/s（对标10_DC_MOTOR_PID_3工程）
 {
         if(keyspeed == 5){
-            base_speed = 1500;
+            base_speed = 1000;          /* 1.00 m/s（全速） */
         }
         else if(keyspeed == 4){
-            base_speed = 1000;
+            base_speed = 800;           /* 0.80 m/s */
         }
         else if (keyspeed == 3) {
-            base_speed = 700;
-        }
-         else if (keyspeed == 2) {
-            base_speed = 500;
-        }
-         else if(keyspeed == 1){
-            base_speed = 300;   /* 与参考工程 target_speed_1 = 300 mm/s 一致 */
+            base_speed = 600;           /* 0.60 m/s */
+        } 
+        else if (keyspeed == 2) {
+            base_speed = 400;           /* 0.40 m/s */
+        } 
+        else if(keyspeed == 1){
+            base_speed = 200;           /* 0.20 m/s */
         }
         else {
             base_speed = 0;
@@ -101,12 +97,10 @@ void speed(uint8_t keyspeed) //任务函数，mm/s（对标10_DC_MOTOR_PID_3）
 void renwu(void) //任务函数
 {
     uint8_t threshold = 0;
-
     if (quanshu == 0)
         return;
-
-        threshold = quanshu * 4;
-
+        
+    threshold = quanshu * 4;
     if (m0 >= threshold) {
         key.start = 0;
         App_PWM_Set_L(0);
@@ -122,14 +116,10 @@ void renwu(void) //任务函数
     }
 }
 
-
-
-
 int main(void)
 {
     SYSCFG_DL_init();
     SysTick_Init();
-
     MPU6050_Init();
     OLED_Init();
     Encoder_Init();
@@ -143,29 +133,26 @@ int main(void)
     //初始化led
     LED4_High;
 
-
     /* Don't remove this! */
     Interrupt_Init();
 
     /* 使能循迹PID定时器中断 */
     NVIC_EnableIRQ(TIMER_xunji_pid_INST_INT_IRQN);
 
-	//根据黑白校准值初始化传感器
-	No_MCU_Ganv_Sensor_Init(&sensor,white,black);
+    //根据黑白校准值初始化传感器
+    No_MCU_Ganv_Sensor_Init(&sensor,white,black);
 
     //设置DMA搬运的起始地址
     DL_DMA_setSrcAddr(DMA, DMA_CH0_CHAN_ID, (uint32_t) &ADC0->ULLMEM.MEMRES[0]);
+
     //设置DMA搬运的目的地址
     DL_DMA_setDestAddr(DMA, DMA_CH0_CHAN_ID, (uint32_t) &ADC_VALUE[0]);
+
     //开启DMA
     DL_DMA_enableChannel(DMA, DMA_CH0_CHAN_ID);
+
     //开启ADC转换
-    DL_ADC12_startConversion(ADC12_0_INST);	
-
-    /*OLED_ShowString(0,0,(uint8_t *)"Pitch",8);
-    OLED_ShowString(0,2,(uint8_t *)" Roll",8);
-    OLED_ShowString(0,4,(uint8_t *)"  Yaw",8);*/
-
+    DL_ADC12_startConversion(ADC12_0_INST);
 
     OLED_ShowString(0,0,(uint8_t *)"m0",8);
     OLED_ShowString(0,2,(uint8_t *)"digtal",8);
@@ -174,56 +161,46 @@ int main(void)
 
     while (1) 
     {
-
-
         key_work();
+
         if (turn_state == TURN_IDLE) {
             speed(key.keyspeed);
         }
 
-        //oled显示mpu6050数据
-        /*sprintf((char *)oled_buffer, "%-6.1f", pitch);
-        OLED_ShowString(5*8,0,oled_buffer,16);
-        sprintf((char *)oled_buffer, "%-6.1f", roll);
-        OLED_ShowString(5*8,2,oled_buffer,16);
-        sprintf((char *)oled_buffer, "%-6.1f", yaw);
-        OLED_ShowString(5*8,4,oled_buffer,16);*/
-
         //oled显示圈数
         sprintf((char *)oled_buffer, "%d", m0);
         OLED_ShowString(5*8,0,oled_buffer,16);
+        
         sprintf((char *)oled_buffer, "%x", Digtal);
         OLED_ShowString(5*8,2,oled_buffer,16);
+        
         sprintf((char *)oled_buffer, "%d", key.quan);
         OLED_ShowString(5*8,4,oled_buffer,16);
+        
         sprintf((char *)oled_buffer, "%d", key.keyspeed);
         OLED_ShowString(5*8,6,oled_buffer,16);
 
-        
-            No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
-		    //获取传感器数字量结果(只有当有黑白值传入进去了之后才会有这个值！！)
-		    Digtal=Get_Digtal_For_User(&sensor);
-            Get_err2();   /* 更新 err2，供 Err2() 返回 */
-            /*printf("Digtal %d-%d-%d-%d-%d-%d-%d-%d\r\n",(Digtal>>0)&0x01,(Digtal>>1)&0x01,(Digtal>>2)&0x01,(Digtal>>3)&0x01,(Digtal>>4)&0x01,(Digtal>>5)&0x01,(Digtal>>6)&0x01,(Digtal>>7)&0x01);
-			if(Get_Anolog_Value(&sensor,Anolog)){
-			printf("Anolog %d-%d-%d-%d-%d-%d-%d-%d\r\n",Anolog[0],Anolog[1],Anolog[2],Anolog[3],Anolog[4],Anolog[5],Anolog[6],Anolog[7]);
-			}
-			
-			//获取传感器归一化结果(只有当有黑白值传入进去了之后才会有这个值！！有黑白值初始化后返回1 没有返回 0)
-			if(Get_Normalize_For_User(&sensor,Normal)){
-			printf("Normalize %d-%d-%d-%d-%d-%d-%d-%d\r\n",Normal[0],Normal[1],Normal[2],Normal[3],Normal[4],Normal[5],Normal[6],Normal[7]);
-			}*/
+        No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
 
+        /* 获取传感器数字量结果(只有当有黑白值传入进去了之后才会有这个值！) */
+        Digtal=Get_Digtal_For_User(&sensor);
 
-        /*---- 直角检测（使用 Err2()，sensor2.c 已做噪点过滤）----*/
+        Get_err2();   /* 更新 err2，供 Err2() 返回 */
+
+#if !SPEED_TEST
+        /*---- 直角检测（左侧大幅偏离 → 立即断电）----*/
         if (baohu_flag == 0 && turn_state == TURN_IDLE) {
-            if (Err2() == -5) {   // 左三全黑 = 右直角
+            if (Err2() >= 5) {   // 质心偏左 ≥5，即至少左边2路见黑线
                 turn_state = TURN_FORWARD;
                 turn_timer = 0;
-                g_speed_ctrl_enabled = 0;   /* 关闭速度环，改用手动 PWM 减速 */
+                g_speed_ctrl_enabled = 0;   /* 关闭速度环，防止 PI 刹车导致反转 */
+                App_PWM_Set_L(0);           /* 直接断电，摩擦力自然停下 */
+                App_PWM_Set_R(0);
+                SpeedCtrl_Reset();
                 /* m0++; */  // TODO: 测试完后恢复
             }
         }
+#endif
 
         /*---- 转弯保护期（避免重复检测）----*/
         if (baohu_flag == 1) {
@@ -239,15 +216,17 @@ int main(void)
             renwu();
         }
 
+#if !SPEED_TEST
         /*---- 直角转弯状态机 ----*/
         switch (turn_state) {
         case TURN_FORWARD:
-            /* 【测试】保持当前速度直行 0.3s 后停车 */
-            if (turn_timer >= 300) {
+            /* 主动刹车：前40ms施加反向PWM(-30%)，让车立即停下 */
+            if (turn_timer < 40) {
+                App_PWM_Set_L(-30);
+                App_PWM_Set_R(-30);
+            } else {
                 App_PWM_Set_L(0);
                 App_PWM_Set_R(0);
-                turn_state = TURN_IDLE;
-                turn_timer = 0;
             }
             break;
 
@@ -288,19 +267,78 @@ int main(void)
         default:
             break;
         }
+#endif
 
-        /*---- 正常循迹（每6ms执行一次）----*/
+#if SPEED_TEST
+        /*==============================================================
+         * 速度环 PI 调参：0.5m/s ↔ 1.0m/s 交替，每2秒切换
+         * VOFA FireWater：目标速度,左轮实际,右轮实际
+         *==============================================================*/
+        {
+            static uint32_t phase_timer   = 0;
+            static uint8_t  phase         = 0;      /* 0→0.5m/s, 1→1.0m/s */
+            static uint8_t  phase_changed = 1;
+            static uint32_t last_ms       = 0;
+
+            if (test_ms - last_ms >= 50) {
+                last_ms = test_ms;
+                float target = (phase == 0) ? 0.5f : 1.0f;
+
+                if (phase_changed) {
+                    phase_changed = 0;
+                    SpeedCtrl_Reset();
+                }
+
+                SpeedCtrl_Update(target, target);
+
+                printf("%.3f,%.3f,%.3f\r\n",
+                       target, GetSpeed_L(), GetSpeed_R());
+
+                phase_timer += 50;
+                if (phase_timer >= 2000) {
+                    phase_timer = 0;
+                    phase = !phase;
+                    phase_changed = 1;
+                }
+            }
+        }
+#else
+        /*==============================================================
+         * 正常模式：每50ms调用速度环
+         *==============================================================*/
+        {
+            static uint32_t last_speed_ms = 0;
+
+            if (test_ms - last_speed_ms >= 50) {
+                last_speed_ms = test_ms;
+
+                if (key.start == 1 && turn_state == TURN_IDLE) {
+                    /* 检测 key.start 上升沿：重置速度环 */
+                    if (last_start == 0) {
+                        SpeedCtrl_Reset();
+                        last_start = 1;
+                    }
+                    SpeedCtrl_Update(g_target_speed_L, g_target_speed_R);
+                } else {
+                    last_start = 0;
+                    SpeedCtrl_Update(0.0f, 0.0f);
+                }
+            }
+        }
+#endif
+
+        /*---- 正常循迹（每6ms计算一次目标速度）----*/
         if (key.start == 1 && turn_state == TURN_IDLE) {
             if (Tick_angle_pid >= 6) {
                 Tracking_SpeedLoop(Err2(), base_speed);
                 Tick_angle_pid = 0;
             }
         }
-
-
+        if (key.start == 0) {
+            last_start = 0;
+        }
     }
 }
-
 
 /**
  * @brief 定时器中断回调函数（1ms周期）
@@ -311,15 +349,13 @@ void TIMER_xunji_pid_INST_IRQHandler(void)
     if (turn_state != TURN_IDLE) {
         turn_timer++;
     }
-
     /* 保护期计时 */
     if (baohu_flag == 1) {
         baohu_time++;
     }
-
     if (key.start == 1) {
         delay_flag++;
     }
-
     Tick_angle_pid++;
+    test_ms++;
 }

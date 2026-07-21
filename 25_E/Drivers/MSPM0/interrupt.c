@@ -205,9 +205,8 @@ void GROUP1_IRQHandler(void)
  * SPEED_PID 定时器中断（TIMG6，50ms）
  *
  * 对标参考工程 MOTOR_PID_INST_IRQHandler：
- *   1. 编码器测速（Encoder_UpdateSpeeds）
- *   2. 双路增量式 PI（SpeedCtrl_Update）
- * ================================================================ */
+ * 仅负责编码器测速（Encoder_UpdateSpeeds）。
+ * 速度环 SpeedCtrl_Update 由 main() 主循环统一调度。 */
 #if defined(SPEED_PID_INST_IRQHandler)
 void SPEED_PID_INST_IRQHandler(void)
 {
@@ -215,7 +214,6 @@ void SPEED_PID_INST_IRQHandler(void)
     {
     case DL_TIMERG_IIDX_LOAD:
         Encoder_UpdateSpeeds();
-        SpeedCtrl_Update();
         break;
     default:
         break;

@@ -1,11 +1,9 @@
 /**
  * @file    speed_ctrl.h
- * @brief   双路增量式PI速度控制器（对标10_DC_MOTOR_PID_3工程）
+ * @brief   双路位置式PI速度控制器
  *
- * 与参考工程差异：
- *   - 从单路扩展为双路（左/右独立 PI）
- *   - PWM 占空比使用 [-100, +100] 浮点（适配本工程 motor.c）
- *   - 增加循迹差速接口 Tracking_SpeedLoop()
+ * 速度环：位置式 PI  →  duty = Kp * error + Ki * integral
+ * 循迹环：P 控制器   →  差速目标 = base ± Kp * sensor_error
  */
 
 #ifndef SPEED_CTRL_H
@@ -16,18 +14,23 @@
 
 /* ---------- 速度环 PI 参数 ----------
  * 
- * 参考工程 kp=0.5, ki=0.4（duty 0~4000），
- * 本工程 duty 单位是百分比（0~100），且速度单位为 m/s。
+ * 位置式 PI：duty = Kp * error + Ki * integral
+ * - Kp：误差→占空比直接映射，1m/s误差 ≈ Kp% 占空比
+ * - Ki：稳态误差收敛速度
+ * duty 单位：百分比 [-100, +100]，速度单位：m/s
  * ----------------------------------- */
-#define SPD_KP  150.0f    /* 比例系数 */
-#define SPD_KI  5.0f     /* 积分系数 */
+#define SPD_KP  150.0f     /* 比例系数 */
+#define SPD_KI  60.0f     /* 积分系数 */
+
+/* ---------- 积分限幅（防饱和回弹） ---------- */
+#define INTEGRAL_MAX  10.0f
 
 /* ---------- PWM 占空比限幅 ---------- */
 #define PWM_DUTY_MAX   100.0f
 #define PWM_DUTY_MIN  -100.0f
 
 /* ---------- 循迹差速 P 增益 ---------- */
-#define TRACK_KP  0.035f    /* 传感器误差 → 速度差（m/s） */  
+#define TRACK_KP  0.02f    /* 传感器误差 → 速度差（m/s） */
 
 /* ---------- 左右目标速度（循迹环设置，速度环 ISR 消费） ---------- */
 extern volatile float g_target_speed_L;   /* m/s */
@@ -41,7 +44,7 @@ void SpeedCtrl_Init(void);
 void SpeedCtrl_Reset(void);
 
 /* 速度环更新（50ms 定时器 ISR 中调用） */
-void SpeedCtrl_Update(void);
+void SpeedCtrl_Update(float target_L, float target_R);
 
 /* 循迹环接口：设置差速目标 */
 void Tracking_SpeedLoop(int16_t sensor_error, float base_speed_mmps);

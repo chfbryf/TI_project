@@ -1,10 +1,10 @@
 /**
  * @file    speed_ctrl.c
- * @brief   双路增量式PI速度控制器（对标10_DC_MOTOR_PID_3工程）
+ * @brief   双路位置式PI速度控制器
  *
- * 算法：
- *   PWM_duty += Kp * (error - last_error) + Ki * error
- *   （增量式 PI，与参考工程 DC_MOTOR_PID() 完全一致）
+ * 算法（位置式 PI）：
+ *   integral += error
+ *   duty = Kp * error + Ki * integral    （带抗积分饱和）
  *
  * 架构：
  *   循迹环（main 主循环） → 设置 g_target_speed_L/R
@@ -20,10 +20,8 @@ volatile float g_target_speed_L = 0.0f;
 volatile float g_target_speed_R = 0.0f;
 
 /* ---- 左右独立 PI 状态 ---- */
-static float last_error_L = 0.0f;
-static float last_error_R = 0.0f;
-static float pwm_duty_L   = 0.0f;
-static float pwm_duty_R   = 0.0f;
+static float integral_L = 0.0f;
+static float integral_R = 0.0f;
 
 /* ---- 速度环全局使能（TURN_SPIN 时由 main 置 0，禁止 ISR 写 PWM） ---- */
 volatile uint8_t g_speed_ctrl_enabled = 1;
@@ -35,65 +33,74 @@ volatile uint8_t g_speed_ctrl_enabled = 1;
  * ================================================================ */
 void SpeedCtrl_Init(void)
 {
-    last_error_L = 0.0f;
-    last_error_R = 0.0f;
-    pwm_duty_L   = 0.0f;
-    pwm_duty_R   = 0.0f;
-    g_target_speed_L = 0.0f;
-    g_target_speed_R = 0.0f;
+    integral_L = 0.0f;
+    integral_R = 0.0f;
     g_speed_ctrl_enabled = 1;
 }
 
 /* ================================================================
  * SpeedCtrl_Reset
  *
- * 重置 PI 积分（转弯等场景下清除历史误差）。
+ * 清零积分，转弯 / 停车 / 模式切换时调用。
  * ================================================================ */
 void SpeedCtrl_Reset(void)
 {
-    last_error_L = 0.0f;
-    last_error_R = 0.0f;
-    pwm_duty_L   = 0.0f;
-    pwm_duty_R   = 0.0f;
+    integral_L = 0.0f;
+    integral_R = 0.0f;
 }
 
 /* ================================================================
  * SpeedCtrl_Update
  *
  * 由 SPEED_PID 定时器 ISR（50ms）调用。
- * 对左右电机各执行一次增量式 PI 计算并输出 PWM。
+ * 位置式 PI + 抗积分饱和。
  * ================================================================ */
-void SpeedCtrl_Update(void)
+void SpeedCtrl_Update(float target_L, float target_R)
 {
-    float error, current_error;
+    float error, duty;
 
-    if (!g_speed_ctrl_enabled) return;   /* 速度环关闭（如 TURN_SPIN 时手动控制 PWM） */
+    if (!g_speed_ctrl_enabled) return;
 
-    /* ---- 左轮增量式 PI ---- */
-    error         = g_target_speed_L - GetSpeed_L();
-    current_error = error;
-    pwm_duty_L   += SPD_KP * (current_error - last_error_L)
-                  + SPD_KI * current_error;
-    last_error_L  = current_error;
+    /* ---- 左轮位置式 PI ---- */
+    error = target_L - GetSpeed_L();
 
-    /* 限幅 */
-    if (pwm_duty_L > PWM_DUTY_MAX)  pwm_duty_L = PWM_DUTY_MAX;
-    if (pwm_duty_L < PWM_DUTY_MIN)  pwm_duty_L = PWM_DUTY_MIN;
-
-    App_PWM_Set_L(pwm_duty_L);
-
-    /* ---- 右轮增量式 PI ---- */
-    error         = g_target_speed_R - GetSpeed_R();
-    current_error = error;
-    pwm_duty_R   += SPD_KP * (current_error - last_error_R)
-                  + SPD_KI * current_error;
-    last_error_R  = current_error;
+    /* 抗积分饱和：仅在未饱和时累加积分 */
+    if ((duty = SPD_KP * error + SPD_KI * integral_L) > PWM_DUTY_MAX) {
+        if (error < 0.0f) integral_L += error;   /* 超速时允许减积分 */
+    } else if (duty < PWM_DUTY_MIN) {
+        if (error > 0.0f) integral_L += error;   /* 欠速时允许加积分 */
+    } else {
+        integral_L += error;
+    }
 
     /* 限幅 */
-    if (pwm_duty_R > PWM_DUTY_MAX)  pwm_duty_R = PWM_DUTY_MAX;
-    if (pwm_duty_R < PWM_DUTY_MIN)  pwm_duty_R = PWM_DUTY_MIN;
+    if (duty > PWM_DUTY_MAX)  duty = PWM_DUTY_MAX;
+    if (duty < PWM_DUTY_MIN)  duty = PWM_DUTY_MIN;
 
-    App_PWM_Set_R(pwm_duty_R);
+    /* 积分限幅（防止长时间饱和后回弹过大） */
+    if (integral_L >  INTEGRAL_MAX) integral_L =  INTEGRAL_MAX;
+    if (integral_L < -INTEGRAL_MAX) integral_L = -INTEGRAL_MAX;
+
+    App_PWM_Set_L(duty);
+
+    /* ---- 右轮位置式 PI ---- */
+    error = target_R - GetSpeed_R();
+
+    if ((duty = SPD_KP * error + SPD_KI * integral_R) > PWM_DUTY_MAX) {
+        if (error < 0.0f) integral_R += error;
+    } else if (duty < PWM_DUTY_MIN) {
+        if (error > 0.0f) integral_R += error;
+    } else {
+        integral_R += error;
+    }
+
+    if (duty > PWM_DUTY_MAX)  duty = PWM_DUTY_MAX;
+    if (duty < PWM_DUTY_MIN)  duty = PWM_DUTY_MIN;
+
+    if (integral_R >  INTEGRAL_MAX) integral_R =  INTEGRAL_MAX;
+    if (integral_R < -INTEGRAL_MAX) integral_R = -INTEGRAL_MAX;
+
+    App_PWM_Set_R(duty);
 }
 
 /* ================================================================

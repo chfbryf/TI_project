@@ -18,13 +18,13 @@ void App_PWM_Set_L(float Duty)
 
     if(Duty >= 0)
     {
-        BIN2_High;
-        BIN1_Low;
+        BIN1_High;
+        BIN2_Low;
     }
     else
     {
-        BIN1_High;
-        BIN2_Low;
+        BIN2_High;
+        BIN1_Low;
     }
 
     DL_TimerG_setCaptureCompareValue(PWM_0_INST, (uint16_t)(fabsf(Duty) / 100.0f * PERIOD), GPIO_PWM_0_C0_IDX);
@@ -42,13 +42,13 @@ void App_PWM_Set_R(float Duty)
 
     if(Duty >= 0)
     {
-        AIN2_High;
-        AIN1_Low;
+        AIN1_High;
+        AIN2_Low;
     }
     else
     {
-        AIN1_High;
-        AIN2_Low;
+        AIN2_High;
+        AIN1_Low;
     }
 
     DL_TimerG_setCaptureCompareValue(PWM_0_INST, (uint16_t)(fabsf(Duty) / 100.0f * (PERIOD)), GPIO_PWM_0_C1_IDX);
