@@ -68,6 +68,10 @@ static volatile uint8_t baohu_flag;
 volatile uint8_t quanshu;
 static volatile uint8_t m0; //转弯计数
 
+/* 直角检测去抖 */
+#define TURN_DEBOUNCE_THRESHOLD  3    /* 连续 N 次检测到黑才触发（~30ms） */
+static uint8_t turn_debounce;
+
 
 
 uint8_t oled_buffer[32];
@@ -203,6 +207,7 @@ int main(void)
             No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
 		    //获取传感器数字量结果(只有当有黑白值传入进去了之后才会有这个值！！)
 		    Digtal=Get_Digtal_For_User(&sensor);
+            Get_err2();   /* 更新 err2，供 Err2() 返回 */
             /*printf("Digtal %d-%d-%d-%d-%d-%d-%d-%d\r\n",(Digtal>>0)&0x01,(Digtal>>1)&0x01,(Digtal>>2)&0x01,(Digtal>>3)&0x01,(Digtal>>4)&0x01,(Digtal>>5)&0x01,(Digtal>>6)&0x01,(Digtal>>7)&0x01);
 			if(Get_Anolog_Value(&sensor,Anolog)){
 			printf("Anolog %d-%d-%d-%d-%d-%d-%d-%d\r\n",Anolog[0],Anolog[1],Anolog[2],Anolog[3],Anolog[4],Anolog[5],Anolog[6],Anolog[7]);
@@ -214,14 +219,19 @@ int main(void)
 			}*/
 
 
-        /*---- 直角检测 ----*/
+        /*---- 直角检测（去抖）----*/
         if (baohu_flag == 0 && turn_state == TURN_IDLE) {
             if ((Digtal & 0xE0) == 0) {   // 左侧3路全黑 = 右直角
-                turn_state = TURN_FORWARD;
-                turn_timer = 0;
-                save_base_speed = base_speed;
-                /* m0++; */  // TODO: 测试完后恢复
-                SpeedCtrl_Reset();
+                if (++turn_debounce >= TURN_DEBOUNCE_THRESHOLD) {
+                    turn_state = TURN_FORWARD;
+                    turn_timer = 0;
+                    save_base_speed = base_speed;
+                    turn_debounce = 0;
+                    /* m0++; */  // TODO: 测试完后恢复
+                    SpeedCtrl_Reset();
+                }
+            } else {
+                turn_debounce = 0;   /* 不满足条件，清零重新计数 */
             }
         }
 
@@ -247,12 +257,12 @@ int main(void)
                 Tick_angle_pid = 0;
                 Tracking_SpeedLoop(0, save_base_speed);
             }
-            /* 【测试】直行0.3s后停车 */
+            /* 直行0.3s后进入原地旋转 */
             if (turn_timer >= 300) {
-                App_PWM_Set_L(0);
-                App_PWM_Set_R(0);
-                turn_state = TURN_IDLE;
+                turn_state = TURN_SPIN;
                 turn_timer = 0;
+                g_speed_ctrl_enabled = 0;   /* 关闭速度环，由 TURN_SPIN 直接控制 PWM */
+                SpeedCtrl_Reset();
             }
             break;
 
@@ -266,6 +276,7 @@ int main(void)
                 App_PWM_Set_R(0);
                 turn_state = TURN_RECOVER;
                 turn_timer = 0;
+                g_speed_ctrl_enabled = 1;   /* 恢复速度环 */
                 SpeedCtrl_Reset();
                 key.start = 1;
             }

@@ -27,11 +27,14 @@
 #define PWM_DUTY_MIN  -100.0f
 
 /* ---------- 循迹差速 P 增益 ---------- */
-#define TRACK_KP  0.02f   /* 传感器误差 → 速度差（m/s） */
+#define TRACK_KP  0.05f    /* 传感器误差 → 速度差（m/s） */
 
 /* ---------- 左右目标速度（循迹环设置，速度环 ISR 消费） ---------- */
 extern volatile float g_target_speed_L;   /* m/s */
 extern volatile float g_target_speed_R;   /* m/s */
+
+/* ---------- 速度环使能标志（TURN_SPIN 期间关闭，避免与直接 PWM 控制冲突） ---------- */
+extern volatile uint8_t g_speed_ctrl_enabled;
 
 /* ---------- API ---------- */
 void SpeedCtrl_Init(void);

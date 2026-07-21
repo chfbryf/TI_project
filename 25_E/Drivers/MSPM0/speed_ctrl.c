@@ -25,6 +25,9 @@ static float last_error_R = 0.0f;
 static float pwm_duty_L   = 0.0f;
 static float pwm_duty_R   = 0.0f;
 
+/* ---- 速度环全局使能（TURN_SPIN 时由 main 置 0，禁止 ISR 写 PWM） ---- */
+volatile uint8_t g_speed_ctrl_enabled = 1;
+
 /* ================================================================
  * SpeedCtrl_Init
  *
@@ -38,6 +41,7 @@ void SpeedCtrl_Init(void)
     pwm_duty_R   = 0.0f;
     g_target_speed_L = 0.0f;
     g_target_speed_R = 0.0f;
+    g_speed_ctrl_enabled = 1;
 }
 
 /* ================================================================
@@ -62,6 +66,8 @@ void SpeedCtrl_Reset(void)
 void SpeedCtrl_Update(void)
 {
     float error, current_error;
+
+    if (!g_speed_ctrl_enabled) return;   /* 速度环关闭（如 TURN_SPIN 时手动控制 PWM） */
 
     /* ---- 左轮增量式 PI ---- */
     error         = g_target_speed_L - GetSpeed_L();
@@ -102,10 +108,11 @@ void SpeedCtrl_Update(void)
  * ================================================================ */
 void Tracking_SpeedLoop(int16_t sensor_error, float base_speed_mmps)
 {
-    float diff = (float)sensor_error * TRACK_KP;
+    float diff  = (float)sensor_error * TRACK_KP;
+    float base  = base_speed_mmps / 1000.0f;  /* mm/s → m/s */
 
-    g_target_speed_L = base_speed_mmps + diff;
-    g_target_speed_R = base_speed_mmps - diff;
+    g_target_speed_L = base + diff;
+    g_target_speed_R = base - diff;
 
     /* 下限钳位：不输出负目标速度（由循迹逻辑决定倒车） */
     if (g_target_speed_L < 0.0f) g_target_speed_L = 0.0f;
