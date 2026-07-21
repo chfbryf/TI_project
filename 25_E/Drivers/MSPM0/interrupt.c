@@ -7,15 +7,19 @@
 #include "vl53l0x.h"
 #include "lsm6dsv16x.h"
 #include "encoder.h"
+#include "speed_ctrl.h"
 
 uint8_t enable_group1_irq = 0;
 
 void Interrupt_Init(void)
 {
-    if(enable_group1_irq)
-    {
-        NVIC_EnableIRQ(1);
-    }
+    /* 无条件使能编码器中断，不再依赖 enable_group1_irq */
+    #if defined GPIO_MULTIPLE_GPIOA_INT_IRQN
+    NVIC_EnableIRQ(GPIO_MULTIPLE_GPIOA_INT_IRQN);
+    #endif
+    #if defined GPIO_EncoderB_INT_IRQN
+    NVIC_EnableIRQ(GPIO_EncoderB_INT_IRQN);
+    #endif
 }
 
 void SysTick_Handler(void)
@@ -196,3 +200,25 @@ void GROUP1_IRQHandler(void)
             break;
     }
 }
+
+/* ================================================================
+ * SPEED_PID 定时器中断（TIMG6，50ms）
+ *
+ * 对标参考工程 MOTOR_PID_INST_IRQHandler：
+ *   1. 编码器测速（Encoder_UpdateSpeeds）
+ *   2. 双路增量式 PI（SpeedCtrl_Update）
+ * ================================================================ */
+#if defined(SPEED_PID_INST_IRQHandler)
+void SPEED_PID_INST_IRQHandler(void)
+{
+    switch (DL_TimerG_getPendingInterrupt(SPEED_PID_INST))
+    {
+    case DL_TIMERG_IIDX_LOAD:
+        Encoder_UpdateSpeeds();
+        SpeedCtrl_Update();
+        break;
+    default:
+        break;
+    }
+}
+#endif

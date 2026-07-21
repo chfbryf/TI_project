@@ -35,13 +35,12 @@
 #include "stdio.h"
 #include "encoder.h"
 #include "motor.h"
-#include "sensor.h"
 #include "key.h"
-#include "pid.h"
 #include "sys.h"
 #include "stdint.h"
 #include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
 #include "sensor2.h"
+#include "speed_ctrl.h"
 
 
 
@@ -52,20 +51,22 @@ unsigned short Normal[8];
 
 static volatile uint8_t Tick_angle_pid;  //循迹环时间计算标志位
 
-static volatile uint32_t biansu_time; 
-static volatile uint32_t yunsu_time; 
-static volatile uint32_t baohu_time;
-static volatile float save_base_speed;   // 转弯前速度，用于减速过渡
-static volatile uint32_t yunsu_recovery_step;  // 恢复阶段步数
+/* 直角转弯状态机 */
+typedef enum {
+    TURN_IDLE = 0,      // 无转弯，正常循迹
+    TURN_FORWARD,       // 前进0.3s（停止循迹直行）
+    TURN_SPIN,          // 原地旋转，等待中间灰度检测到黑线
+    TURN_RECOVER        // 1s内加速恢复到目标速度
+} TurnState;
 
-
+static volatile TurnState turn_state = TURN_IDLE;
+static volatile uint32_t turn_timer;     // 转弯阶段计时(ms)
+static volatile uint32_t baohu_time;     // 转弯保护计时(ms)
+static volatile float save_base_speed;   // 转弯前速度，用于恢复
 
 static volatile uint8_t baohu_flag; 
-static volatile uint8_t biansu_flag; 
-static volatile uint8_t yunsu_flag; 
-static volatile uint8_t xia_flag; 
 volatile uint8_t quanshu;
-static volatile uint8_t m0; //转弯标志
+static volatile uint8_t m0; //转弯计数
 
 
 
@@ -75,29 +76,26 @@ uint8_t oled_buffer[32];
 No_MCU_Sensor sensor;
 
 
-void speed(uint8_t keyspeed) //任务函数
+void speed(uint8_t keyspeed) //任务函数，mm/s（对标10_DC_MOTOR_PID_3）
 {
-
         if(keyspeed == 5){
-            base_speed = 70;
+            base_speed = 1500;
         }
         else if(keyspeed == 4){
-            base_speed = 50;
+            base_speed = 1000;
         }
         else if (keyspeed == 3) {
-            base_speed = 30;
+            base_speed = 700;
         }
          else if (keyspeed == 2) {
-            base_speed = 20;
+            base_speed = 500;
         }
          else if(keyspeed == 1){
-            base_speed = 10;
+            base_speed = 300;   /* 与参考工程 target_speed_1 = 300 mm/s 一致 */
         }
         else {
             base_speed = 0;
         }
-    
-    
 }
 
 void renwu(void) //任务函数
@@ -118,9 +116,8 @@ void renwu(void) //任务函数
         key.keyspeed = 0;
         key.quan = 0;
         m0 = 0;
-        biansu_flag = 0;
-        yunsu_flag = 0;
-        xia_flag = 0;
+        turn_state = TURN_IDLE;
+        turn_timer = 0;
         baohu_flag = 0;
     }
 }
@@ -136,7 +133,12 @@ int main(void)
     MPU6050_Init();
     OLED_Init();
     Encoder_Init();
-    App_Motor_Init();
+    SpeedCtrl_Init();
+
+    /* 启动 PWM 定时器（TIMG8）与速度环定时器（SPEED_PID: TIMG6, 50ms），对标参考工程 motor_init */
+    DL_TimerG_startCounter(PWM_0_INST);
+    DL_TimerG_startCounter(SPEED_PID_INST);
+    NVIC_EnableIRQ(SPEED_PID_INST_INT_IRQN);
 
     //初始化led
     LED4_High;
@@ -172,8 +174,10 @@ int main(void)
 
     while (1) 
     {
+
+
         key_work();
-        if (!biansu_flag && !yunsu_flag) {
+        if (turn_state == TURN_IDLE) {
             speed(key.keyspeed);
         }
 
@@ -210,120 +214,89 @@ int main(void)
 			}*/
 
 
-        if (baohu_flag == 0){
-                switch (xia_flag) {
-            case 0:
-                if ((Digtal & 0xe0) == 0) {
-                    xia_flag = 1;
-                    // 立即清除PID残留，避免保持上次的强转向值
-                    App_PWM_Set_L(base_speed);
-                    App_PWM_Set_R(base_speed);
-                }
-                break;
-            case 1:
-                if ((Digtal & 0xe0) != 0) {
-                    baohu_flag = 1;
-                    m0++;
-                    biansu_time = 0;
-                    if (key.quan != 0)
-                        biansu_flag = 1;
-                }
-                break;
-        }
+        /*---- 直角检测 ----*/
+        if (baohu_flag == 0 && turn_state == TURN_IDLE) {
+            if ((Digtal & 0xE0) == 0) {   // 左侧3路全黑 = 右直角
+                turn_state = TURN_FORWARD;
+                turn_timer = 0;
+                save_base_speed = base_speed;
+                /* m0++; */  // TODO: 测试完后恢复
+                SpeedCtrl_Reset();
+            }
         }
 
-
-        // 保护期计时，用于避免线路检测抖动 
-        if (baohu_flag == 1)
-        {    
-            if (baohu_time >= 4000)
-            {
+        /*---- 转弯保护期（避免重复检测）----*/
+        if (baohu_flag == 1) {
+            if (baohu_time >= 4000) {
                 baohu_flag = 0;
                 baohu_time = 0;
-                xia_flag = 0;
             }
         }
 
+        /*---- 圈数任务 ----*/
+        if (key.start == 1) {
+            quanshu = key.quan;
+            renwu();
+        }
 
-        //运行圈数
-
-            if (key.start == 1)
-            {
-                    quanshu = key.quan;
-                    renwu(); // 执行跑圈任务
+        /*---- 直角转弯状态机 ----*/
+        switch (turn_state) {
+        case TURN_FORWARD:
+            /* 停止循迹，直行0.3s（每6ms调用一次PID） */
+            if (Tick_angle_pid >= 6) {
+                Tick_angle_pid = 0;
+                Tracking_SpeedLoop(0, save_base_speed);
             }
-        
-
-        // 直角转弯处理 
-    if (biansu_flag == 1)
-    {
-        if (biansu_time < 300)    // 强制转弯300ms后退出
-        {
-            App_PWM_Set_L(18);
-            App_PWM_Set_R(5);
-            key.start = 0;
-        }
-        else
-        {
-            biansu_time = 0;
-            biansu_flag = 0;
-            yunsu_flag = 1;
-            yunsu_time = 0;
-            xia_flag = 0;
-            save_base_speed = base_speed;
-            yunsu_recovery_step = 0;
-            Motor_PID_Reset();  // 清除转弯期间PID积分残留
-            key.start = 1;
-        }
-    }
-
-    // 匀速恢复阶段 
-    if (yunsu_flag == 1)
-    {
-        if (yunsu_time < 300)
-        {
-            // 阶段1：0.3s内从当前速度线性减速到5
-            float progress = (float)yunsu_time / 300.0f;
-            base_speed = save_base_speed + (5.0f - save_base_speed) * progress;
-        }
-        else
-        {
-            // 阶段2：每25ms加1，快速恢复到目标速度
-            uint32_t target_step = (yunsu_time - 300) / 25;
-            while (yunsu_recovery_step < target_step)
-            {
-                yunsu_recovery_step++;
-                if (base_speed < 20)
-                {
-                    base_speed++;
-                }
-                else
-                {
-                    yunsu_flag = 0;
-                    break;
-                }
+            /* 【测试】直行0.3s后停车 */
+            if (turn_timer >= 300) {
+                App_PWM_Set_L(0);
+                App_PWM_Set_R(0);
+                turn_state = TURN_IDLE;
+                turn_timer = 0;
             }
+            break;
+
+        case TURN_SPIN:
+            /* 原地旋转：左轮反转，右轮正转 */
+            App_PWM_Set_L(-10);
+            App_PWM_Set_R(10);
+            /* 中间两个灰度（bit4、bit3）任一检测到黑线 → 停止 */
+            if ((Digtal & 0x18) != 0x18) {
+                App_PWM_Set_L(0);
+                App_PWM_Set_R(0);
+                turn_state = TURN_RECOVER;
+                turn_timer = 0;
+                SpeedCtrl_Reset();
+                key.start = 1;
+            }
+            break;
+
+        case TURN_RECOVER:
+            /* 1s内从0线性加速到目标速度，使用串级PID循迹 */
+            if (Tick_angle_pid >= 6) {
+                Tick_angle_pid = 0;
+                float progress = (float)turn_timer / 1000.0f;
+                if (progress > 1.0f) progress = 1.0f;
+                float recover_speed = save_base_speed * progress;
+                Tracking_SpeedLoop(Err2(), recover_speed);
+            }
+            if (turn_timer >= 1000) {
+                turn_state = TURN_IDLE;
+                turn_timer = 0;
+                baohu_flag = 1;   // 进入保护期
+                baohu_time = 0;
+            }
+            break;
+
+        case TURN_IDLE:
+        default:
+            break;
         }
-    }
 
-
-        if(key.start == 1)
-        {
-            if(Tick_angle_pid >= 6)
-            {
-                if (biansu_flag == 0)
-                {
-                    if (xia_flag == 1)
-                    {
-                        // 检测到直角入口，暂停循迹修正，保持直行
-                        App_PWM_Set_L(base_speed);
-                        App_PWM_Set_R(base_speed);
-                    }
-                    else
-                    {
-                        xunji_Proc();
-                    }
-                }
+        /*---- 正常循迹（每6ms执行一次）----*/
+        if (key.start == 1 && turn_state == TURN_IDLE) {
+            if (Tick_angle_pid >= 6) {
+                Tracking_SpeedLoop(Err2(), base_speed);
                 Tick_angle_pid = 0;
             }
         }
@@ -338,26 +311,19 @@ int main(void)
  */
 void TIMER_xunji_pid_INST_IRQHandler(void)
 {
-
-                //三秒保护
-            if(baohu_flag == 1)
-            {
-                baohu_time++;
-            }
-            if(biansu_flag == 1)
-            {
-                biansu_time++;
-            }
-            if(yunsu_flag == 1)
-            {
-            yunsu_time++;
-            }
-
-    if(key.start == 1)
-    {
-       delay_flag++;
+    /* 转弯计时 */
+    if (turn_state != TURN_IDLE) {
+        turn_timer++;
     }
-    
+
+    /* 保护期计时 */
+    if (baohu_flag == 1) {
+        baohu_time++;
+    }
+
+    if (key.start == 1) {
+        delay_flag++;
+    }
 
     Tick_angle_pid++;
 }
