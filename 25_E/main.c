@@ -68,10 +68,6 @@ static volatile uint8_t baohu_flag;
 volatile uint8_t quanshu;
 static volatile uint8_t m0; //转弯计数
 
-/* 直角检测去抖 */
-#define TURN_DEBOUNCE_THRESHOLD  3    /* 连续 N 次检测到黑才触发（~30ms） */
-static uint8_t turn_debounce;
-
 
 
 uint8_t oled_buffer[32];
@@ -219,19 +215,13 @@ int main(void)
 			}*/
 
 
-        /*---- 直角检测（去抖）----*/
+        /*---- 直角检测（使用 Err2()，sensor2.c 已做噪点过滤）----*/
         if (baohu_flag == 0 && turn_state == TURN_IDLE) {
-            if ((Digtal & 0xE0) == 0) {   // 左侧3路全黑 = 右直角
-                if (++turn_debounce >= TURN_DEBOUNCE_THRESHOLD) {
-                    turn_state = TURN_FORWARD;
-                    turn_timer = 0;
-                    save_base_speed = base_speed;
-                    turn_debounce = 0;
-                    /* m0++; */  // TODO: 测试完后恢复
-                    SpeedCtrl_Reset();
-                }
-            } else {
-                turn_debounce = 0;   /* 不满足条件，清零重新计数 */
+            if (Err2() == -5) {   // 左三全黑 = 右直角
+                turn_state = TURN_FORWARD;
+                turn_timer = 0;
+                g_speed_ctrl_enabled = 0;   /* 关闭速度环，改用手动 PWM 减速 */
+                /* m0++; */  // TODO: 测试完后恢复
             }
         }
 
@@ -252,17 +242,12 @@ int main(void)
         /*---- 直角转弯状态机 ----*/
         switch (turn_state) {
         case TURN_FORWARD:
-            /* 停止循迹，直行0.3s（每6ms调用一次PID） */
-            if (Tick_angle_pid >= 6) {
-                Tick_angle_pid = 0;
-                Tracking_SpeedLoop(0, save_base_speed);
-            }
-            /* 直行0.3s后进入原地旋转 */
+            /* 【测试】保持当前速度直行 0.3s 后停车 */
             if (turn_timer >= 300) {
-                turn_state = TURN_SPIN;
+                App_PWM_Set_L(0);
+                App_PWM_Set_R(0);
+                turn_state = TURN_IDLE;
                 turn_timer = 0;
-                g_speed_ctrl_enabled = 0;   /* 关闭速度环，由 TURN_SPIN 直接控制 PWM */
-                SpeedCtrl_Reset();
             }
             break;
 

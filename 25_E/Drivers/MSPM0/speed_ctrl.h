@@ -27,7 +27,7 @@
 #define PWM_DUTY_MIN  -100.0f
 
 /* ---------- 循迹差速 P 增益 ---------- */
-#define TRACK_KP  0.05f    /* 传感器误差 → 速度差（m/s） */
+#define TRACK_KP  0.035f    /* 传感器误差 → 速度差（m/s） */  
 
 /* ---------- 左右目标速度（循迹环设置，速度环 ISR 消费） ---------- */
 extern volatile float g_target_speed_L;   /* m/s */
