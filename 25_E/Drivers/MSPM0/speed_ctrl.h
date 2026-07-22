@@ -3,7 +3,7 @@
  * @brief   双路位置式PI速度控制器
  *
  * 速度环：位置式 PI  →  duty = Kp * error + Ki * integral
- * 循迹环：P 控制器   →  差速目标 = base ± Kp * sensor_error
+ * 循迹环：PID 控制器  →  差速目标 = base ± (Kp*error + Ki*integral + Kd*Δerror)
  */
 
 #ifndef SPEED_CTRL_H
@@ -29,8 +29,11 @@
 #define PWM_DUTY_MAX   100.0f
 #define PWM_DUTY_MIN  -100.0f
 
-/* ---------- 循迹差速 P 增益 ---------- */
-#define TRACK_KP  0.02f    /* 传感器误差 → 速度差（m/s） */
+/* ---------- 循迹差速 PID 增益 ---------- */
+#define TRACK_KP  0.025f    /* 传感器误差 → 速度差（m/s） */
+#define TRACK_KI  0.0001f   /* 误差积分 → 速度差（m/s） */
+#define TRACK_KD  0.06f   /* 误差变化率 → 速度差（m/s） */
+#define TRACK_INTEGRAL_MAX  50.0f  /* 循迹积分限幅 */
 
 /* ---------- 左右目标速度（循迹环设置，速度环 ISR 消费） ---------- */
 extern volatile float g_target_speed_L;   /* m/s */
@@ -48,5 +51,6 @@ void SpeedCtrl_Update(float target_L, float target_R);
 
 /* 循迹环接口：设置差速目标 */
 void Tracking_SpeedLoop(int16_t sensor_error, float base_speed_mmps);
+void Tracking_SpeedLoop_Reset(void);
 
 #endif /* SPEED_CTRL_H */

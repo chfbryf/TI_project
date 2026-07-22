@@ -41,8 +41,7 @@
 #include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
 #include "sensor2.h"
 #include "speed_ctrl.h"
-
-#define SPEED_TEST 1   /* 速度环测试：1=启用, 0=正常循迹 */
+#include <math.h>
 
 
 unsigned short Anolog[8]={0};
@@ -50,7 +49,6 @@ unsigned short white[8]={3129,2516,2376,2634,2745,2947,2290,2247};
 unsigned short black[8]={730,465,358,402,370,463,279,291};
 unsigned short Normal[8];
 
-static volatile uint8_t Tick_angle_pid;  //循迹环时间计算标志位
 
 /* 直角转弯状态机 */
 typedef enum {
@@ -103,9 +101,7 @@ void renwu(void) //任务函数
         
     threshold = quanshu * 4;
     if (m0 >= threshold) {
-        key.start = 0;
-        App_PWM_Set_L(0);
-        App_PWM_Set_R(0);
+        key.start = 0;      /* 速度环 else 分支以目标 0 停车 */
         base_speed = 0;
         quanshu = 0;
         key.keyspeed = 0;
@@ -162,7 +158,6 @@ int main(void)
 
     while (1) 
     {
-        printf("%f, %f\n", GetSpeed_L(), GetSpeed_R());
         key_work();
 
         if (turn_state == TURN_IDLE) {
@@ -189,69 +184,81 @@ int main(void)
 
         Get_err2();   /* 更新 err2，供 Err2() 返回 */
 
-#if !SPEED_TEST
-        /*---- 直角检测（左侧大幅偏离 → 立即断电）----*/
+        /*---- 直角检测（最左3个传感器全部丢线且持续50ms）----*/
         if (baohu_flag == 0 && turn_state == TURN_IDLE) {
-            if (Err2() >= 5) {   // 质心偏左 ≥5，即至少左边2路见黑线
-                turn_state = TURN_FORWARD;
-                turn_timer = 0;
-                g_speed_ctrl_enabled = 0;   /* 关闭速度环，防止 PI 刹车导致反转 */
-                App_PWM_Set_L(0);           /* 直接断电，摩擦力自然停下 */
-                App_PWM_Set_R(0);
-                SpeedCtrl_Reset();
-                /* m0++; */  // TODO: 测试完后恢复
+            static uint32_t left_lost_start = 0;
+            static uint8_t  left_lost_flag  = 0;
+
+            if (Digtal == 0xff || !(Digtal & ~0x3f) ) {        /* bit7/6/5 = 最左3个传感器全部看到黑色（丢线） */
+                if (!left_lost_flag) {
+                    left_lost_start = test_ms;
+                    left_lost_flag  = 1;
+                } else if (test_ms - left_lost_start >= 50) {
+                    turn_state = TURN_FORWARD;
+                    turn_timer = 0;
+                    save_base_speed = base_speed;
+                    SpeedCtrl_Reset();
+                    Tracking_SpeedLoop_Reset();
+                    m0++;
+                    left_lost_flag = 0;
+                }
+            } else {
+                left_lost_flag = 0;
             }
         }
-#endif
 
         /*---- 转弯保护期（避免重复检测）----*/
         if (baohu_flag == 1) {
-            if (baohu_time >= 4000) {
+            if (baohu_time >= 2500) {
                 baohu_flag = 0;
                 baohu_time = 0;
             }
         }
 
-        /*---- 圈数任务 ----*/
-        if (key.start == 1) {
+        /*---- 圈数任务（仅在正常循迹时检查，避免打断转弯）----*/
+        if (key.start == 1 && turn_state == TURN_IDLE) {
             quanshu = key.quan;
             renwu();
         }
 
-#if !SPEED_TEST
+        static uint32_t last_track_ms = 0;
+
         /*---- 直角转弯状态机 ----*/
         switch (turn_state) {
         case TURN_FORWARD:
-            /* 主动刹车：前40ms施加反向PWM(-30%)，让车立即停下 */
-            if (turn_timer < 40) {
-                App_PWM_Set_L(-30);
-                App_PWM_Set_R(-30);
+            if (turn_timer < 300) {
+                /* 0~300ms 直行，两轮同速 */
             } else {
-                App_PWM_Set_L(0);
-                App_PWM_Set_R(0);
+                /* 刹车至停稳或超时 1.2s 兜底 */
+                if ((fabsf(GetSpeed_L()) < 0.02f && fabsf(GetSpeed_R()) < 0.02f)
+                    || turn_timer > 1500) {
+                    turn_state = TURN_SPIN;
+                    turn_timer = 0;
+                }
             }
             break;
 
         case TURN_SPIN:
-            /* 原地旋转：左轮反转，右轮正转 */
-            App_PWM_Set_L(-10);
-            App_PWM_Set_R(10);
-            /* 中间两个灰度（bit4、bit3）任一检测到黑线 → 停止 */
+            /* 原地旋转：速度环控制，左轮反转/右轮正转，目标见速度环 else-if 分支 */
+            /* 中间两个灰度（bit4、bit3）任一检测到黑线 → 停止旋转 */
             if ((Digtal & 0x18) != 0x18) {
-                App_PWM_Set_L(0);
-                App_PWM_Set_R(0);
                 turn_state = TURN_RECOVER;
                 turn_timer = 0;
-                g_speed_ctrl_enabled = 1;   /* 恢复速度环 */
                 SpeedCtrl_Reset();
-                key.start = 1;
+                Tracking_SpeedLoop_Reset();
+            } else if (turn_timer > 2000) {
+                /* 超时 2s：强制退出旋转，照常恢复循迹 */
+                turn_state = TURN_RECOVER;
+                turn_timer = 0;
+                SpeedCtrl_Reset();
+                Tracking_SpeedLoop_Reset();
             }
             break;
 
         case TURN_RECOVER:
-            /* 1s内从0线性加速到目标速度，使用串级PID循迹 */
-            if (Tick_angle_pid >= 6) {
-                Tick_angle_pid = 0;
+            /* 每50ms计算一次目标速度，1s内从0线性加速 */
+            if (test_ms - last_track_ms >= 50) {
+                last_track_ms = test_ms;
                 float progress = (float)turn_timer / 1000.0f;
                 if (progress > 1.0f) progress = 1.0f;
                 float recover_speed = save_base_speed * progress;
@@ -269,35 +276,7 @@ int main(void)
         default:
             break;
         }
-#endif
 
-#if SPEED_TEST
-        /*==============================================================
-         * 速度环测试：左右轮固定 0.5 m/s
-         * VOFA FireWater：目标速度,左轮实际,右轮实际
-         *==============================================================*/
-        {
-            static uint32_t last_ms       = 0;
-            static uint8_t  first_call    = 1;
-
-            if (test_ms - last_ms >= 50) {
-                last_ms = test_ms;
-
-                if (first_call) {
-                    first_call = 0;
-                    SpeedCtrl_Reset();
-                }
-
-                {
-
-                     SpeedCtrl_Update(0.5f, 0.5f);
-
-                    printf("%.3f,%.3f,0.5\r\n",
-                            GetSpeed_L(), GetSpeed_R());
-                }
-            }
-        }
-#else
         /*==============================================================
          * 正常模式：每50ms调用速度环
          *==============================================================*/
@@ -311,26 +290,35 @@ int main(void)
                     /* 检测 key.start 上升沿：重置速度环 */
                     if (last_start == 0) {
                         SpeedCtrl_Reset();
+                        Tracking_SpeedLoop_Reset();
                         last_start = 1;
                     }
                     SpeedCtrl_Update(g_target_speed_L, g_target_speed_R);
+                } else if (turn_state == TURN_RECOVER) {
+                    /* 恢复期：速度环按循迹目标运行 */
+                    SpeedCtrl_Update(g_target_speed_L, g_target_speed_R);
+                } else if (turn_state == TURN_FORWARD && turn_timer < 300) {
+                    /* 直行 300ms，两轮同速，不循迹 */
+                    SpeedCtrl_Update(base_speed / 1000.0f, base_speed / 1000.0f);
+                } else if (turn_state == TURN_FORWARD) {
+                    /* 300ms 后用速度环以目标 0 刹车 */
+                    SpeedCtrl_Update(0.0f, 0.0f);
+                } else if (turn_state == TURN_SPIN) {
+                    /* 原地旋转：左轮反转 0.3 m/s，右轮正转 0.3 m/s */
+                    SpeedCtrl_Update(0.1f, -0.1f);
                 } else {
-                    last_start = 0;
                     SpeedCtrl_Update(0.0f, 0.0f);
                 }
             }
         }
-#endif
 
-#if !SPEED_TEST
-        /*---- 正常循迹（每6ms计算一次目标速度）----*/
+        /*---- 正常循迹（每50ms计算一次目标速度，与速度环同步）----*/
         if (key.start == 1 && turn_state == TURN_IDLE) {
-            if (Tick_angle_pid >= 6) {
+            if (test_ms - last_track_ms >= 50) {
+                last_track_ms = test_ms;
                 Tracking_SpeedLoop(Err2(), base_speed);
-                Tick_angle_pid = 0;
             }
         }
-#endif
         if (key.start == 0) {
             last_start = 0;
         }
@@ -353,6 +341,5 @@ void TIMER_xunji_pid_INST_IRQHandler(void)
     if (key.start == 1) {
         delay_flag++;
     }
-    Tick_angle_pid++;
     test_ms++;
 }

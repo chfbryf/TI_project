@@ -23,7 +23,11 @@ volatile float g_target_speed_R = 0.0f;
 static float integral_L = 0.0f;
 static float integral_R = 0.0f;
 
-/* ---- 速度环全局使能（TURN_SPIN 时由 main 置 0，禁止 ISR 写 PWM） ---- */
+/* ---- 循迹环 PID 状态 ---- */
+static float track_integral = 0.0f;
+static int16_t prev_error = 0;
+
+/* ---- 速度环全局使能 ---- */
 volatile uint8_t g_speed_ctrl_enabled = 1;
 
 /* ================================================================
@@ -104,6 +108,17 @@ void SpeedCtrl_Update(float target_L, float target_R)
 }
 
 /* ================================================================
+ * Tracking_SpeedLoop_Reset
+ *
+ * 清零循迹误差历史值，转弯 / 停车 / 模式切换时调用。
+ * ================================================================ */
+void Tracking_SpeedLoop_Reset(void)
+{
+    track_integral = 0.0f;
+    prev_error = 0;
+}
+
+/* ================================================================
  * Tracking_SpeedLoop
  *
  * 循迹环接口。
@@ -115,13 +130,26 @@ void SpeedCtrl_Update(float target_L, float target_R)
  * ================================================================ */
 void Tracking_SpeedLoop(int16_t sensor_error, float base_speed_mmps)
 {
-    float diff  = (float)sensor_error * TRACK_KP;
+    float diff;
     float base  = base_speed_mmps / 1000.0f;  /* mm/s → m/s */
+
+    /* PID 循迹：P 快速响应 + I 消除稳态 + D 抑制过冲 */
+    track_integral += (float)sensor_error;
+
+    /* 积分限幅（防饱和） */
+    if (track_integral >  TRACK_INTEGRAL_MAX) track_integral =  TRACK_INTEGRAL_MAX;
+    if (track_integral < -TRACK_INTEGRAL_MAX) track_integral = -TRACK_INTEGRAL_MAX;
+
+    diff = (float)sensor_error * TRACK_KP
+         + track_integral * TRACK_KI
+         + (float)(sensor_error - prev_error) * TRACK_KD;
+
+    prev_error = sensor_error;
 
     g_target_speed_L = base + diff;
     g_target_speed_R = base - diff;
 
-    /* 下限钳位：不输出负目标速度（由循迹逻辑决定倒车） */
+    /* 下限钳位：不输出负目标速度 */
     if (g_target_speed_L < 0.0f) g_target_speed_L = 0.0f;
     if (g_target_speed_R < 0.0f) g_target_speed_R = 0.0f;
 }
