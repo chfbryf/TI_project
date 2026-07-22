@@ -18,6 +18,7 @@
  */
 
 #include "encoder.h"
+#include "lpf.h"
 
 /* ---- 全局脉冲计数器（GPIO 中断累加，定时器 ISR 清零） ---- */
 volatile int32_t counter_R_A = 0;
@@ -26,6 +27,10 @@ volatile int32_t counter_L_A = 0;
 /* ---- 内部速度缓存（m/s） ---- */
 static float speed_L = 0.0f;
 static float speed_R = 0.0f;
+
+/* ---- 一阶低通滤波器（平滑量化台阶） ---- */
+static LPF_t lpf_L;
+static LPF_t lpf_R;
 
 /* ================================================================
  * Encoder_Init
@@ -37,6 +42,10 @@ void Encoder_Init(void)
 {
     NVIC_EnableIRQ(GPIO_MULTIPLE_GPIOA_INT_IRQN);
     NVIC_EnableIRQ(GPIO_EncoderB_INT_IRQN);
+
+    /* 初始化速度低通滤波器：截止频率 1Hz，采样频率 20Hz（50ms 周期） */
+    LPF_Init(&lpf_L, 1.0f, 20.0f);
+    LPF_Init(&lpf_R, 1.0f, 20.0f);
 }
 
 /* ================================================================
@@ -131,6 +140,10 @@ void Encoder_UpdateSpeeds(void)
     } else {
         last_valid_speed_R = speed_R;
     }
+
+    /* 一阶低通滤波：平滑量化台阶导致的周期性抖动 */
+    speed_L = LPF_Apply(&lpf_L, speed_L);
+    speed_R = LPF_Apply(&lpf_R, speed_R);
 }
 
 /* ================================================================
