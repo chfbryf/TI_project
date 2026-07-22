@@ -42,7 +42,8 @@
 #include "sensor2.h"
 #include "speed_ctrl.h"
 
-#define SPEED_TEST 1   /* 速度环测试模式：1=启用, 0=禁用 */
+#define SPEED_TEST 1   /* 速度环测试：1=启用, 0=正常循迹 */
+
 
 unsigned short Anolog[8]={0};
 unsigned short white[8]={3129,2516,2376,2634,2745,2947,2290,2247};
@@ -161,6 +162,7 @@ int main(void)
 
     while (1) 
     {
+        printf("%f, %f\n", GetSpeed_L(), GetSpeed_R());
         key_work();
 
         if (turn_state == TURN_IDLE) {
@@ -271,34 +273,27 @@ int main(void)
 
 #if SPEED_TEST
         /*==============================================================
-         * 速度环 PI 调参：0.5m/s ↔ 1.0m/s 交替，每2秒切换
+         * 速度环测试：左右轮固定 0.5 m/s
          * VOFA FireWater：目标速度,左轮实际,右轮实际
          *==============================================================*/
         {
-            static uint32_t phase_timer   = 0;
-            static uint8_t  phase         = 0;      /* 0→0.5m/s, 1→1.0m/s */
-            static uint8_t  phase_changed = 1;
             static uint32_t last_ms       = 0;
+            static uint8_t  first_call    = 1;
 
             if (test_ms - last_ms >= 50) {
                 last_ms = test_ms;
-                float target = (phase == 0) ? 0.5f : 1.0f;
 
-                if (phase_changed) {
-                    phase_changed = 0;
+                if (first_call) {
+                    first_call = 0;
                     SpeedCtrl_Reset();
                 }
 
-                SpeedCtrl_Update(target, target);
+                {
 
-                printf("%.3f,%.3f,%.3f\r\n",
-                       target, GetSpeed_L(), GetSpeed_R());
+                     SpeedCtrl_Update(0.5f, 0.5f);
 
-                phase_timer += 50;
-                if (phase_timer >= 2000) {
-                    phase_timer = 0;
-                    phase = !phase;
-                    phase_changed = 1;
+                    printf("%.3f,%.3f,0.5\r\n",
+                            GetSpeed_L(), GetSpeed_R());
                 }
             }
         }
@@ -327,6 +322,7 @@ int main(void)
         }
 #endif
 
+#if !SPEED_TEST
         /*---- 正常循迹（每6ms计算一次目标速度）----*/
         if (key.start == 1 && turn_state == TURN_IDLE) {
             if (Tick_angle_pid >= 6) {
@@ -334,6 +330,7 @@ int main(void)
                 Tick_angle_pid = 0;
             }
         }
+#endif
         if (key.start == 0) {
             last_start = 0;
         }
