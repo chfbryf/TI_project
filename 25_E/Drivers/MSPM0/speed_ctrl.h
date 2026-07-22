@@ -30,9 +30,9 @@
 #define PWM_DUTY_MIN  -100.0f
 
 /* ---------- 循迹差速 PID 增益 ---------- */
-#define TRACK_KP  0.025f    /* 传感器误差 → 速度差（m/s） */
-#define TRACK_KI  0.0001f   /* 误差积分 → 速度差（m/s） */
-#define TRACK_KD  0.06f   /* 误差变化率 → 速度差（m/s） */
+#define TRACK_KP  0.05f    /* 传感器误差 → 速度差（m/s） */
+#define TRACK_KI  0.0008f   /* 误差积分 → 速度差（m/s） */
+#define TRACK_KD  0.205f   /* 误差变化率 → 速度差（m/s） */
 #define TRACK_INTEGRAL_MAX  50.0f  /* 循迹积分限幅 */
 
 /* ---------- 左右目标速度（循迹环设置，速度环 ISR 消费） ---------- */
@@ -46,7 +46,7 @@ extern volatile uint8_t g_speed_ctrl_enabled;
 void SpeedCtrl_Init(void);
 void SpeedCtrl_Reset(void);
 
-/* 速度环更新（50ms 定时器 ISR 中调用） */
+/* 速度环更新（50ms 定时器 ISR 中调用） */ 
 void SpeedCtrl_Update(float target_L, float target_R);
 
 /* 循迹环接口：设置差速目标 */

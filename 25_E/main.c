@@ -60,9 +60,7 @@ typedef enum {
 
 static volatile TurnState turn_state = TURN_IDLE;
 static volatile uint32_t turn_timer;     // 转弯阶段计时(ms)
-static volatile uint32_t baohu_time;     // 转弯保护计时(ms)
 static volatile float save_base_speed;   // 转弯前速度，用于恢复
-static volatile uint8_t baohu_flag;
 
 volatile uint8_t quanshu;
 static volatile uint8_t m0; //转弯计数
@@ -109,7 +107,7 @@ void renwu(void) //任务函数
         m0 = 0;
         turn_state = TURN_IDLE;
         turn_timer = 0;
-        baohu_flag = 0;
+        SpeedCtrl_Reset();        /* 清积分，快速制动 */
     }
 }
 
@@ -184,8 +182,8 @@ int main(void)
 
         Get_err2();   /* 更新 err2，供 Err2() 返回 */
 
-        /*---- 直角检测（最左3个传感器全部丢线且持续50ms）----*/
-        if (baohu_flag == 0 && turn_state == TURN_IDLE) {
+        /*---- 直角检测（最左3个传感器全部丢线且持续50ms，含冷却保护）----*/
+        if (key.start == 1 && turn_state == TURN_IDLE) {
             static uint32_t left_lost_start = 0;
             static uint8_t  left_lost_flag  = 0;
 
@@ -194,24 +192,37 @@ int main(void)
                     left_lost_start = test_ms;
                     left_lost_flag  = 1;
                 } else if (test_ms - left_lost_start >= 50) {
-                    turn_state = TURN_FORWARD;
-                    turn_timer = 0;
-                    save_base_speed = base_speed;
-                    SpeedCtrl_Reset();
-                    Tracking_SpeedLoop_Reset();
-                    m0++;
+                    /* 冷却计时：上次触发后 2500ms 内不重复触发转弯 */
+                    {
+                        static uint32_t last_trigger_time = 0;
+                        static uint8_t  cool_down = 0;
+
+                        if (!cool_down) {
+                            /* 非冷却期：正常触发转弯 */
+                            turn_state = TURN_FORWARD;
+                            turn_timer = 0;
+                            save_base_speed = base_speed;
+                            SpeedCtrl_Reset();
+                            Tracking_SpeedLoop_Reset();
+                            last_trigger_time = test_ms;
+                            cool_down = 1;
+                        } else if (test_ms - last_trigger_time >= 2500) {
+                            /* 冷却结束，允许再次触发 */
+                            turn_state = TURN_FORWARD;
+                            turn_timer = 0;
+                            save_base_speed = base_speed;
+                            SpeedCtrl_Reset();
+                            Tracking_SpeedLoop_Reset();
+                            last_trigger_time = test_ms;
+                            cool_down = 1;  /* 重新进入冷却 */
+                        }
+                        /* 无论是否冷却，保护期间也计数 */
+                        m0++;
+                    }
                     left_lost_flag = 0;
                 }
             } else {
                 left_lost_flag = 0;
-            }
-        }
-
-        /*---- 转弯保护期（避免重复检测）----*/
-        if (baohu_flag == 1) {
-            if (baohu_time >= 2500) {
-                baohu_flag = 0;
-                baohu_time = 0;
             }
         }
 
@@ -226,7 +237,7 @@ int main(void)
         /*---- 直角转弯状态机 ----*/
         switch (turn_state) {
         case TURN_FORWARD:
-            if (turn_timer < 300) {
+            if (turn_timer < 400) {
                 /* 0~300ms 直行，两轮同速 */
             } else {
                 /* 刹车至停稳或超时 1.2s 兜底 */
@@ -239,19 +250,20 @@ int main(void)
             break;
 
         case TURN_SPIN:
-            /* 原地旋转：速度环控制，左轮反转/右轮正转，目标见速度环 else-if 分支 */
-            /* 中间两个灰度（bit4、bit3）任一检测到黑线 → 停止旋转 */
-            if ((Digtal & 0x18) != 0x18) {
-                turn_state = TURN_RECOVER;
-                turn_timer = 0;
-                SpeedCtrl_Reset();
-                Tracking_SpeedLoop_Reset();
-            } else if (turn_timer > 2000) {
-                /* 超时 2s：强制退出旋转，照常恢复循迹 */
-                turn_state = TURN_RECOVER;
-                turn_timer = 0;
-                SpeedCtrl_Reset();
-                Tracking_SpeedLoop_Reset();
+            /* 原地旋转，中间两个灰度（bit4、bit3）连续确认 → 停止旋转 */
+            {
+                static uint8_t spin_confirm = 0;
+                if ((Digtal & 0x18) != 0x18) {
+                    if (++spin_confirm >= 4) {
+                        turn_state = TURN_RECOVER;
+                        turn_timer = 0;
+                        SpeedCtrl_Reset();
+                        Tracking_SpeedLoop_Reset();
+                        spin_confirm = 0;
+                    }
+                } else {
+                    spin_confirm = 0;
+                }
             }
             break;
 
@@ -267,8 +279,6 @@ int main(void)
             if (turn_timer >= 1000) {
                 turn_state = TURN_IDLE;
                 turn_timer = 0;
-                baohu_flag = 1;   // 进入保护期
-                baohu_time = 0;
             }
             break;
 
@@ -305,7 +315,7 @@ int main(void)
                     SpeedCtrl_Update(0.0f, 0.0f);
                 } else if (turn_state == TURN_SPIN) {
                     /* 原地旋转：左轮反转 0.3 m/s，右轮正转 0.3 m/s */
-                    SpeedCtrl_Update(0.1f, -0.1f);
+                    SpeedCtrl_Update(0.07f, -0.07f);
                 } else {
                     SpeedCtrl_Update(0.0f, 0.0f);
                 }
@@ -333,10 +343,6 @@ void TIMER_xunji_pid_INST_IRQHandler(void)
     /* 转弯计时 */
     if (turn_state != TURN_IDLE) {
         turn_timer++;
-    }
-    /* 保护期计时 */
-    if (baohu_flag == 1) {
-        baohu_time++;
     }
     if (key.start == 1) {
         delay_flag++;
