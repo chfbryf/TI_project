@@ -6,6 +6,15 @@ volatile uint8_t black_detected;
 
 #define BLACK_DEBOUNCE_MS  30
 
+/**
+ * @file    sensor2.c
+ * @brief   灰度传感器误差计算（加权质心法）
+ * @brief   8路传感器从左到右检测到黑线时对应的 Digtal 值
+ * @brief   bit=0 表示黑线，每路对应位置：
+ * @brief   [左1]0xFE [左2]0xFD [左3]0xFB [左4]0xF7
+ * @brief   [右4]0xEF [右3]0xDF [右2]0xBF [右1]0x7F
+ */
+
 void Get_err2(void)
 {
     static volatile uint32_t black_start = 0;
@@ -37,8 +46,8 @@ void Get_err2(void)
     }
 
     /* 加权质心法：8路传感器位置 × 见黑标志
-     * bit7(左) → -7, bit6 → -5, bit5 → -3, bit4 → -1,
-     * bit3 → +1, bit2 → +3, bit1 → +5, bit0(右) → +7
+     * bit0(左1) → +7, bit1(左2) → +5, bit2(左3) → +3, bit3(左4) → +1,
+     * bit4(右4) → -1, bit5(右3) → -3, bit6(右2) → -5, bit7(右1) → -7
      * bit=0 表示见到黑线，对权重求和取平均 */
     {
         static const int8_t weight[8] = {7, 5, 3, 1, -1, -3, -5, -7};

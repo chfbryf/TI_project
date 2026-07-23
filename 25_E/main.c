@@ -187,7 +187,7 @@ int main(void)
             static uint32_t left_lost_start = 0;
             static uint8_t  left_lost_flag  = 0;
 
-            if (Digtal == 0xff || !(Digtal & ~0x3f) ) {        /* bit7/6/5 = 最左3个传感器全部看到黑色（丢线） */
+            if (Digtal == 0xff || (Digtal & 0x07) == 0 ) {     /* bit2/1/0 = 最左3个传感器全部看到黑色（丢线） */
                 if (!left_lost_flag) {
                     left_lost_start = test_ms;
                     left_lost_flag  = 1;
