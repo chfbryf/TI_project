@@ -183,7 +183,7 @@ int main(void)
         Get_err2();   /* 更新 err2，供 Err2() 返回 */
 
         /*---- 直角检测（最左3个传感器全部丢线且持续50ms，含冷却保护）----*/
-        if (key.start == 1 && turn_state == TURN_IDLE) {
+        if (key.start == 1 && quanshu > 0 && turn_state == TURN_IDLE) {
             static uint32_t left_lost_start = 0;
             static uint8_t  left_lost_flag  = 0;
 
