@@ -15,6 +15,9 @@
 #include "icm42688.h"
 #include "ble.h"
 #include "ble_cmd.h"
+#include "servo.h"
+#include "vision.h"
+
 
 /* 编译模式切换：0=从机  1=主机 */
 #define HOST_MODE  0

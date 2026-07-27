@@ -31,7 +31,6 @@
  */
 
 #include "sys.h"
-#include "vision.h"
 
 
 unsigned short Anolog[8]={0};
@@ -59,6 +58,7 @@ int main(void)
     OLED_Init();
     Encoder_Init();
     SpeedCtrl_Init();
+    Servo_Init();
 
     /* 启动 PWM 定时器（TIMG8）与速度环定时器（SPEED_PID: TIMG6, 50ms），对标参考工程 motor_init */
     DL_TimerG_startCounter(PWM_0_INST);
@@ -149,6 +149,7 @@ int main(void)
                 Tracking_SpeedLoop(Err2(), (float)base_speed);
             }
         }
+
 
         //mspm0_delay_ms(1000);
 
