@@ -40,15 +40,9 @@ unsigned short black[8]={730,465,358,402,370,463,279,291};
 unsigned short Normal[8];
 
 
-/* 直角转弯状态机 */
-typedef enum {
-    TURN_IDLE = 0,      // 无转弯，正常循迹
-    TURN_FORWARD,       // 前进0.3s（停止循迹直行）
-    TURN_SPIN,          // 原地旋转，等待中间灰度检测到黑线
-    TURN_RECOVER        // 1s内加速恢复到目标速度
-} TurnState;
-
-static volatile TurnState turn_state = TURN_IDLE;
+/* 直角转弯状态机（定义见 ble_cmd.h，供 BLE 命令触发） */
+volatile TurnState turn_state = TURN_IDLE;
+volatile uint8_t turn_direction = TURN_DIR_LEFT;
 
 static uint8_t last_start = 0;  // 用于检测 key.start 上升沿
 volatile uint32_t test_ms = 0;  // 测试用1ms计数器，在TIMER_xunji_pid ISR中自增
@@ -118,40 +112,13 @@ int main(void)
             }
         }
 
-        //处理BLE数据
-        // BLE_Poll();
-        // if (BLE_FrameAvailable()) {
-        //     uint8_t buf[128];
-        //     BLE_ReadFrame(buf, sizeof(buf));
-
-        //     switch (buf[0]) {
-        //     case BLE_CMD_FORWARD:
-        //         speed(buf[1]);
-        //         g_target_speed_L =  (float)base_speed / 1000.0f;
-        //         g_target_speed_R =  (float)base_speed / 1000.0f;
-        //         break;
-        //     case BLE_CMD_BACKWARD:
-        //         speed(buf[1]);
-        //         g_target_speed_L = -(float)base_speed / 1000.0f;
-        //         g_target_speed_R = -(float)base_speed / 1000.0f;
-        //         break;
-        //     case BLE_CMD_LEFT:
-        //         speed(buf[1]);
-        //         g_target_speed_L = -(float)base_speed / 1000.0f;
-        //         g_target_speed_R =  (float)base_speed / 1000.0f;
-        //         break;
-        //     case BLE_CMD_RIGHT:
-        //         speed(buf[1]);
-        //         g_target_speed_L =  (float)base_speed / 1000.0f;
-        //         g_target_speed_R = -(float)base_speed / 1000.0f;
-        //         break;
-        //     case BLE_CMD_STOP:
-        //         motor_stop();
-        //         break;
-        //     default:
-        //         break;
-        //     }
-        // }
+        // 蓝牙命令处理
+        BLE_Poll();
+        if (BLE_FrameAvailable()) {
+            uint8_t buf[128];
+            uint16_t len = BLE_ReadFrame(buf, sizeof(buf));
+            ble_cmd_dispatch(buf, len);
+        }
 
         //oled显示 ICM42688 yaw
         // ICM42688_ReadAndCompute();

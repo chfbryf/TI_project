@@ -22,12 +22,7 @@
 #define BLE_RX_BUF_SIZE     128       /* 接收缓冲区大小 */
 #define BLE_FRAME_TIMEOUT_MS 50       /* 帧超时（ms），超过此间隔认为一帧结束 */
 
-/* ---------- 遥控命令 ---------- */
-#define BLE_CMD_FORWARD     0x01      /* 前进，参数: 1字节速度 */
-#define BLE_CMD_BACKWARD    0x02      /* 后退，参数: 1字节速度 */
-#define BLE_CMD_LEFT        0x03      /* 左转，参数: 1字节速度 */
-#define BLE_CMD_RIGHT       0x04      /* 右转，参数: 1字节速度 */
-#define BLE_CMD_STOP        0x05      /* 停止 */
+/* ---------- 遥控命令（定义见 ble_cmd.h） ---------- */
 
 /* ---------- API ---------- */
 

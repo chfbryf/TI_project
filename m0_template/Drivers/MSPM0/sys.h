@@ -14,6 +14,7 @@
 #include <math.h>
 #include "icm42688.h"
 #include "ble.h"
+#include "ble_cmd.h"
 
 #define AIN1_High       DL_GPIO_setPins(DIR_AIN1_PORT, DIR_AIN1_PIN)
 #define AIN1_Low        DL_GPIO_clearPins(DIR_AIN1_PORT, DIR_AIN1_PIN)
