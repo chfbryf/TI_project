@@ -43,7 +43,19 @@ void App_PWM_Set_R(float Duty)
 }
 
 /**
- * @brief 急停：清零目标速度、清零积分、关闭 PWM 输出
+ * @brief 急刹：短路电机绕组，利用反向电动势制动
+ */
+void motor_brake(void)
+{
+    /* 左右电机四个半桥全部拉低 → 绕组短路 → 电磁制动 */
+    BIN1_Low; BIN2_Low;
+    AIN1_Low; AIN2_Low;
+    set_motor_pwm(0.0f, GPIO_PWM_0_C0_IDX);
+    set_motor_pwm(0.0f, GPIO_PWM_0_C1_IDX);
+}
+
+/**
+ * @brief 急停：刹车 + 清零目标速度 + 清零积分
  */
 void motor_stop(void)
 {
@@ -52,6 +64,5 @@ void motor_stop(void)
     g_target_speed_R = 0.0f;
     SpeedCtrl_Reset();
     Tracking_SpeedLoop_Reset();
-    App_PWM_Set_L(0.0f);
-    App_PWM_Set_R(0.0f);
+    motor_brake();
 }

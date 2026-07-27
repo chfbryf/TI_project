@@ -6,6 +6,7 @@
 #include "vision.h"
 #include "ti_msp_dl_config.h"
 #include "speed_ctrl.h"       /* g_target_speed_L/R */
+#include "ble_cmd.h"          /* g_ctrl_source */
 
 /* ================================================================
  * 颜色 → 差速动作 查找表
@@ -47,6 +48,9 @@ void Vision_Poll(void)
  * ================================================================ */
 void Vision_Apply(void)
 {
+    /* 只有视觉模式才写入目标速度 */
+    if (g_ctrl_source != CTRL_SRC_LOCAL_VISION) return;
+
     if (g_last_color != 0)
     {
         g_target_speed_L = color_actions[(unsigned char)g_last_color].left;

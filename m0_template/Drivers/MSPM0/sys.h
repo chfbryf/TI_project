@@ -16,6 +16,9 @@
 #include "ble.h"
 #include "ble_cmd.h"
 
+/* 编译模式切换：0=从机  1=主机 */
+#define HOST_MODE  0
+
 #define AIN1_High       DL_GPIO_setPins(DIR_AIN1_PORT, DIR_AIN1_PIN)
 #define AIN1_Low        DL_GPIO_clearPins(DIR_AIN1_PORT, DIR_AIN1_PIN)
 #define AIN2_High       DL_GPIO_setPins(DIR_AIN2_PORT, DIR_AIN2_PIN)

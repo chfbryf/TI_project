@@ -53,10 +53,10 @@ int main(void)
 {
     SYSCFG_DL_init();
     SysTick_Init();
-    //MPU6050_Init();
-    //Init_ICM42688();
+    MPU6050_Init();
+    Init_ICM42688();
     BLE_Init();
-    //OLED_Init();
+    OLED_Init();
     Encoder_Init();
     SpeedCtrl_Init();
 
@@ -90,10 +90,10 @@ int main(void)
     //开启ADC转换
     DL_ADC12_startConversion(ADC12_0_INST);
 
-    // OLED_ShowString(0,0,(uint8_t *)"yaw",8);
-    // OLED_ShowString(0,2,(uint8_t *)"digtal",8);
-    // OLED_ShowString(0,4,(uint8_t *)"quanshu",8);
-    // OLED_ShowString(0,6,(uint8_t *)"speed",8);
+    OLED_ShowString(0,0,(uint8_t *)"yaw",8);
+    OLED_ShowString(0,2,(uint8_t *)"digtal",8);
+    OLED_ShowString(0,4,(uint8_t *)"quanshu",8);
+    OLED_ShowString(0,6,(uint8_t *)"speed",8);
 
     while (1) 
     {
@@ -102,15 +102,6 @@ int main(void)
         //视觉颜色识别
         Vision_Poll();
         Vision_Apply();
-
-        //每500ms发送一次BLE前进指令
-        {
-            static uint32_t last_send = 0;
-            if (delay_flag - last_send >= 500) {
-                last_send = delay_flag;
-                BLE_SendFrame((uint8_t[]){BLE_CMD_BACKWARD, 3}, 2);
-            }
-        }
 
         // 蓝牙命令处理
         BLE_Poll();
@@ -121,27 +112,42 @@ int main(void)
         }
 
         //oled显示 ICM42688 yaw
-        // ICM42688_ReadAndCompute();
-        // sprintf((char *)oled_buffer, "%f", yaw);
-        // OLED_ShowString(5*8,0,oled_buffer,16);
+        ICM42688_ReadAndCompute();
+        sprintf((char *)oled_buffer, "%f", icm42688_yaw);
+        OLED_ShowString(5*8,0,oled_buffer,16);
         
-        // sprintf((char *)oled_buffer, "%x", Digtal);
-        // OLED_ShowString(5*8,2,oled_buffer,16);
+        sprintf((char *)oled_buffer, "%x", Digtal);
+        OLED_ShowString(5*8,2,oled_buffer,16);
         
-        // sprintf((char *)oled_buffer, "%d", key.quan);
-        // OLED_ShowString(5*8,4,oled_buffer,16);
+        sprintf((char *)oled_buffer, "%d", key.quan);
+        OLED_ShowString(5*8,4,oled_buffer,16);
         
-        // sprintf((char *)oled_buffer, "%d", key.keyspeed);
-        // OLED_ShowString(5*8,6,oled_buffer,16);
+        sprintf((char *)oled_buffer, "%d", key.keyspeed);
+        OLED_ShowString(5*8,6,oled_buffer,16);
 
         No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
 		//获取传感器数字量结果(只有当有黑白值传入进去了之后才会有这个值！！)
 		Digtal=Get_Digtal_For_User(&sensor);
-        Get_err2();   /* 更新 err2，供 Err2() 返回 */
+        Get_err2();   /* 更新 err2、black_detected */
 
+        /* ——— 自动切换：BLE控制下检测到黑线 → 接管为本地循迹 ——— */
+        if (g_ctrl_source == CTRL_SRC_BLE && black_detected && base_speed > 0) {
+            g_ctrl_source = CTRL_SRC_LOCAL_TRACK;
+            Tracking_SpeedLoop_Reset();
+        }
 
+        /* ——— 根据控制源执行速度逻辑 ——— */
         if (turn_state == TURN_IDLE) {
-            speed(key.keyspeed);
+            /* 非远程控制时，按键调速 */
+            if (g_ctrl_source != CTRL_SRC_BLE &&
+                g_ctrl_source != CTRL_SRC_LOCAL_VISION) {
+                speed(key.keyspeed);
+            }
+
+            /* 本地循迹：PID 计算差速 → 写入 g_target_speed_L/R */
+            if (g_ctrl_source == CTRL_SRC_LOCAL_TRACK) {
+                Tracking_SpeedLoop(Err2(), (float)base_speed);
+            }
         }
 
         //mspm0_delay_ms(1000);

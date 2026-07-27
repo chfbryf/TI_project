@@ -9,7 +9,7 @@
  *   0x10~0x2F  参数配置（set_speed, set_pid ...）
  *   0x30~0x4F  高级动作（turn_90, turn_180 ...）
  *   0x50~0x6F  外设控制（beep, led, servo ...）
- *   0x70~0x7F  系统命令（reset, status_query ...）
+ *   0x70~0x7F  模式切换（local_track, local_vision, ble_ctrl ...）
  *   0xF0~0xFE  调试预留
  */
 
@@ -36,9 +36,23 @@
 #define BLE_CMD_TURN_LEFT   0x30   /* 左转90度，无参数 */
 #define BLE_CMD_TURN_RIGHT  0x31   /* 右转90度，无参数 */
 
+/* ——— 系统命令 0x70~0x7F ——— */
+#define BLE_CMD_LOCAL_TRACK 0x70   /* 切换为本地循迹模式，无参数 */
+#define BLE_CMD_LOCAL_VISION 0x71  /* 切换为本地视觉模式，无参数 */
+#define BLE_CMD_BLE_CTRL    0x72   /* 切换为蓝牙远程控制模式，无参数 */
+
 /* ================================================================
- * 类型定义
+ * 控制源（决定谁有权写 g_target_speed_L/R）
  * ================================================================ */
+
+typedef enum {
+    CTRL_SRC_NONE = 0,       /* 无控制源，小车停止 */
+    CTRL_SRC_BLE,            /* 蓝牙远程控制 */
+    CTRL_SRC_LOCAL_TRACK,    /* 本地循迹（灰度传感器PID） */
+    CTRL_SRC_LOCAL_VISION,   /* 本地视觉（颜色识别） */
+} ctrl_source_t;
+
+extern volatile ctrl_source_t g_ctrl_source;
 
 /** 命令处理回调函数类型
  *  @param data  数据指针（不含命令ID，指向参数区）

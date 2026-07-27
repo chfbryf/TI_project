@@ -6,5 +6,6 @@
 void App_PWM_Set_L(float Duty);
 void App_PWM_Set_R(float Duty);
 void motor_stop(void);
+void motor_brake(void);
 
 #endif
