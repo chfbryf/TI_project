@@ -97,19 +97,6 @@ int main(void)
 
     while (1) 
     {
-        key_work();
-
-        //视觉颜色识别
-        Vision_Poll();
-        Vision_Apply();
-
-        // 蓝牙命令处理
-        BLE_Poll();
-        if (BLE_FrameAvailable()) {
-            uint8_t buf[128];
-            uint16_t len = BLE_ReadFrame(buf, sizeof(buf));
-            ble_cmd_dispatch(buf, len);
-        }
 
         //oled显示 ICM42688 yaw
         ICM42688_ReadAndCompute();
@@ -124,6 +111,21 @@ int main(void)
         
         sprintf((char *)oled_buffer, "%d", key.keyspeed);
         OLED_ShowString(5*8,6,oled_buffer,16);
+
+        key_work();
+
+        //视觉颜色识别
+        Vision_Poll();
+        Vision_Apply();
+
+        // 蓝牙命令处理
+        BLE_Poll();
+        if (BLE_FrameAvailable()) {
+            uint8_t buf[128];
+            uint16_t len = BLE_ReadFrame(buf, sizeof(buf));
+            ble_cmd_dispatch(buf, len);
+        }
+
 
         No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
 		//获取传感器数字量结果(只有当有黑白值传入进去了之后才会有这个值！！)
