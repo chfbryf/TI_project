@@ -17,6 +17,7 @@
 #include "ble_cmd.h"
 #include "servo.h"
 #include "vision.h"
+#include "renwu.h"
 
 
 /* 编译模式切换：0=从机  1=主机 */

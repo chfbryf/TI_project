@@ -94,6 +94,7 @@ int main(void)
     OLED_ShowString(0,2,(uint8_t *)"digtal",8);
     OLED_ShowString(0,4,(uint8_t *)"quanshu",8);
     OLED_ShowString(0,6,(uint8_t *)"speed",8);
+    g_ctrl_source = CTRL_SRC_LOCAL_TRACK;
 
     while (1) 
     {
@@ -139,7 +140,7 @@ int main(void)
         }
 
         /* ——— 根据控制源执行速度逻辑 ——— */
-        if (turn_state == TURN_IDLE) {
+        if (key.start && turn_state == TURN_IDLE) {
             /* 非远程控制时，按键调速 */
             if (g_ctrl_source != CTRL_SRC_BLE &&
                 g_ctrl_source != CTRL_SRC_LOCAL_VISION) {
@@ -150,8 +151,10 @@ int main(void)
             if (g_ctrl_source == CTRL_SRC_LOCAL_TRACK) {
                 Tracking_SpeedLoop(Err2(), (float)base_speed);
             }
+        } else if (!key.start) {
+            g_target_speed_L = 0.0f;
+            g_target_speed_R = 0.0f;
         }
-
 
         //mspm0_delay_ms(1000);
 
