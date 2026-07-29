@@ -15,7 +15,7 @@ void step_rotate_by(float degrees, uint8_t direction, uint8_t stepper_id);
  * @param stepper_id  电机编号 (1 或 2)
  * @param speed_dps   角速度，单位 度/秒，正=正转，负=反转
  *
- * 与 test 的 Set_PWM(L_PWM,R_PWM) 思路一致：PID 输出直接控制转速。
+ * 直接修改 PWM 周期控制步进频率，占空比固定 50%。
  * speed_dps 绝对值 < 0.06 时自动停转（死区），避免微小误差导致电机啸叫。
  */
 void step_motor_continuous_run(uint8_t stepper_id, float speed_dps);

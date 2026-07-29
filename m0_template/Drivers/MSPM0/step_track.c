@@ -14,6 +14,7 @@
 
 /* ---------- 内部状态 ---------- */
 static int16_t last_error;  /* 上一拍误差（D项用） */
+static float   error_sum;   /* 误差累积（I项用） */
 
 /* ---------- 辅助函数 ---------- */
 
@@ -30,6 +31,7 @@ static float mmps_to_dps(float mmps)
 void StepTrack_Init(void)
 {
     last_error = 0;
+    error_sum  = 0.0f;
 }
 
 void StepTrack_Stop(void)
@@ -37,6 +39,7 @@ void StepTrack_Stop(void)
     step_motor_stop(1);
     step_motor_stop(2);
     last_error = 0;
+    error_sum  = 0.0f;
 }
 
 /**
@@ -52,22 +55,25 @@ void StepTrack_Run(void)
         step_motor_continuous_run(1, 0.0f);
         step_motor_continuous_run(2, 0.0f);
         last_error = 0;
+        error_sum  = 0.0f;
         return;
     }
 
     speed(key.keyspeed);
     float base_dps = mmps_to_dps((float)base_speed);
 
-    /* 直行测试 */
-    step_motor_continuous_run(1, base_dps);
-    step_motor_continuous_run(2, base_dps);
-#if 0
     int16_t error = Err2();
-    float diff = TRACK_KP * base_dps * (error / 7.0f)
-               + TRACK_KD * base_dps * ((error - last_error) / 7.0f);
+    float err_norm = error / 7.0f;
+
+    /* 积分抗饱和：误差反向时清零积分，避免过冲 */
+    if (error * last_error <= 0) error_sum = 0.0f;
+    error_sum += err_norm;
+
+    float diff = base_dps * (TRACK_KP * err_norm
+                           + TRACK_KI * error_sum
+                           + TRACK_KD * (err_norm - last_error / 7.0f));
     last_error = error;
 
-    step_motor_continuous_run(1, base_dps - diff);
-    step_motor_continuous_run(2, base_dps + diff);
-#endif
+    step_motor_continuous_run(1, base_dps + diff);
+    step_motor_continuous_run(2, base_dps - diff);
 }
