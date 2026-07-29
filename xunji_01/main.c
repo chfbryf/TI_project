@@ -67,11 +67,11 @@ static void OLED_UpdateStatus(void)
         sec = 0.0f;
     }
 
-    sprintf(oled_buf, "%.1fs", sec);
+    sprintf(oled_buf, "%.02X", Digtal);
     OLED_ShowString(0, 0, (uint8_t *)oled_buf, 16);
 
     /* Digtal：红外传感器位图 */
-    sprintf(oled_buf, "%02X", Digtal);
+    sprintf(oled_buf, "%.1fs", sec);
     OLED_ShowString(0, 2, (uint8_t *)oled_buf, 16);
 
     /* 按键1：速度档位 */
@@ -88,15 +88,21 @@ static void OLED_UpdateStatus(void)
  * ================================================================ */
 static uint8_t SensorUpdate(void)
 {
+    static uint8_t ir7_db_cnt = 0;
+
     uint8_t ir[8] = {1, 1, 1, 1, 1, 1, 1, 1};  /* 默认全白，防止首帧未到 */
     IR_Read(ir);
+
+    /* 最右边传感器单独消抖：连续3帧见黑才有效 */
+    if (ir[7] == 0) {
+        if (ir7_db_cnt < 3) ir7_db_cnt++;
+    } else {
+        ir7_db_cnt = 0;
+    }
+    ir[7] = (ir7_db_cnt >= 3) ? 0 : 1;
+
     Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
            | (ir[4]<<3) | (ir[5]<<2) | (ir[6]<<1) | (ir[7]<<0);
-
-    /* 消抖：最右边传感器(bit0)必须在旁边传感器(bit1)也见黑时才有效 */
-    if ((Digtal & 0x02) != 0x00) {   /* bit1 = 白 */
-        Digtal |= 0x01;               /* 强制 bit0 = 白，滤除闪烁 */
-    }
 
     Get_err2();
     return Digtal;

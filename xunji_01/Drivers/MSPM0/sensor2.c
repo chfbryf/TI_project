@@ -12,7 +12,7 @@
 int16_t err2;
 volatile uint8_t black_detected;
 
-#define BLACK_DEBOUNCE_MS  30
+#define BLACK_DEBOUNCE_MS  200
 
 void Get_err2(void)
 {
