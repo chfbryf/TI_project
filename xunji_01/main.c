@@ -40,6 +40,9 @@ static uint8_t  time_prev_start = 0;  /* key.start 上升沿检测 */
 static uint32_t track_start_ms  = 0;  /* 行驶起始时间 */
 static uint8_t  track_stopped   = 0;  /* 停车标志 */
 static float    track_final_sec = 0;  /* 停车时刻保留的时间 */
+static uint8_t  decelerating    = 0;  /* 减速中标志 */
+static uint32_t decel_start_ms  = 0;  /* 减速起始时间 */
+static float    decel_start_spd = 0;  /* 减速起始速度 */
 volatile uint32_t test_ms = 0;       /* 1ms 计数器 */
 static char oled_buf[16];
 
@@ -120,10 +123,12 @@ static uint8_t CheckStop(uint8_t d)
         for (uint8_t i = 0; i < 8; i++) {
             if (black_seen & (1 << i)) cnt++;
         }
-        if (cnt >= 5) {
+        if (cnt >= 5 && (test_ms - track_start_ms) >= 18000) {
             track_final_sec = (test_ms - track_start_ms) / 1000.0f;
             track_stopped = 1;
-            StepTrack_Stop();
+            decelerating   = 1;
+            decel_start_ms = test_ms;
+            decel_start_spd = (float)base_speed;
             key.start = 0;
             return 1;
         }
@@ -170,6 +175,26 @@ int main(void)
         key_work();                     /* 1. 按键扫描 */
 
         uint8_t d = SensorUpdate();     /* 2. IR 传感器 + 误差 */
+
+        /* 减速阶段：0.5s 匀速降速至 0 */
+        if (decelerating) {
+            uint32_t elapsed = test_ms - decel_start_ms;
+            if (elapsed >= 500) {
+                step_motor_stop(1);
+                step_motor_stop(2);
+                decelerating = 0;
+            } else {
+                float frac = 1.0f - (float)elapsed / 500.0f;
+                float cur_speed = decel_start_spd * frac;
+                float cur_dps = (cur_speed * 360.0f) / (3.1415926f * 65.0f);
+                int16_t error = Err2();
+                float diff = cur_dps * TRACK_KP * (error / 7.0f);
+                step_motor_continuous_run(1, cur_dps + diff);
+                step_motor_continuous_run(2, cur_dps - diff);
+            }
+            OLED_UpdateStatus();            /* 仍刷新 OLED */
+            continue;
+        }
 
         //ICM42688_ReadAndCompute();    /* 3. ICM42688 姿态解算（未接时注释） */
 
