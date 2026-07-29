@@ -134,8 +134,8 @@ void Tracking_SpeedLoop(int16_t sensor_error, float base_speed_mmps)
 
     prev_error = sensor_error;
 
-    g_target_speed_L = base + diff;
-    g_target_speed_R = base - diff;
+    g_target_speed_L = base - diff;
+    g_target_speed_R = base + diff;
 
     /* 下限钳位：不输出负目标速度 */
     if (g_target_speed_L < 0.0f) g_target_speed_L = 0.0f;

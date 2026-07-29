@@ -8,15 +8,12 @@
 #include "motor.h"
 #include "key.h"
 #include <stdint.h>
-#include "No_Mcu_Ganv_Grayscale_Sensor_Config.h"
+#include "ir_tracking.h"
 #include "sensor2.h"
 #include "speed_ctrl.h"
 #include <math.h>
 #include "icm42688.h"
-#include "ble.h"
-#include "ble_cmd.h"
 #include "servo.h"
-#include "vision.h"
 #include "renwu.h"
 
 

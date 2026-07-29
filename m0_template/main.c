@@ -31,31 +31,20 @@
  */
 
 #include "sys.h"
+#include <stdlib.h>
 
 
-unsigned short Anolog[8]={0};
-unsigned short white[8]={3129,2516,2376,2634,2745,2947,2290,2247};
-unsigned short black[8]={730,465,358,402,370,463,279,291};
-unsigned short Normal[8];
-
-
-/* 直角转弯状态机（定义见 ble_cmd.h，供 BLE 命令触发） */
-volatile TurnState turn_state = TURN_IDLE;
-volatile uint8_t turn_direction = TURN_DIR_LEFT;
-
-static uint8_t last_start = 0;  // 用于检测 key.start 上升沿
-volatile uint32_t test_ms = 0;  // 测试用1ms计数器，在TIMER_xunji_pid ISR中自增
+static uint8_t last_start = 0;  /* 用于检测 key.start 上升沿 */
+volatile uint32_t test_ms = 0;  /* 测试用1ms计数器，在TIMER_xunji_pid ISR中自增 */
 uint8_t oled_buffer[32];
-No_MCU_Sensor sensor;
 
 int main(void)
 {
     SYSCFG_DL_init();
     SysTick_Init();
     MPU6050_Init();
-    Init_ICM42688();
-    BLE_Init();
     OLED_Init();
+    //Init_ICM42688();
     Encoder_Init();
     SpeedCtrl_Init();
     Servo_Init();
@@ -75,37 +64,28 @@ int main(void)
     /* 使能循迹PID定时器中断 */
     NVIC_EnableIRQ(TIMER_xunji_pid_INST_INT_IRQN);
 
-    //根据黑白校准值初始化传感器
-    No_MCU_Ganv_Sensor_Init(&sensor,white,black);
+    /* 初始化红外循迹传感器（UART1, 115200） */
+    IR_Init();
 
-    //设置DMA搬运的起始地址
-    DL_DMA_setSrcAddr(DMA, DMA_CH0_CHAN_ID, (uint32_t) &ADC0->ULLMEM.MEMRES[0]);
-
-    //设置DMA搬运的目的地址
-    DL_DMA_setDestAddr(DMA, DMA_CH0_CHAN_ID, (uint32_t) &ADC_VALUE[0]);
-
-    //开启DMA
-    DL_DMA_enableChannel(DMA, DMA_CH0_CHAN_ID);
-
-    //开启ADC转换
-    DL_ADC12_startConversion(ADC12_0_INST);
-
-    OLED_ShowString(0,0,(uint8_t *)"yaw",8);
+    OLED_ShowString(0,0,(uint8_t *)"time",8);
     OLED_ShowString(0,2,(uint8_t *)"digtal",8);
     OLED_ShowString(0,4,(uint8_t *)"quanshu",8);
     OLED_ShowString(0,6,(uint8_t *)"speed",8);
-    g_ctrl_source = CTRL_SRC_LOCAL_TRACK;
-
     while (1) 
     {
 
-        //oled显示 ICM42688 yaw
-        ICM42688_ReadAndCompute();
-        sprintf((char *)oled_buffer, "%f", icm42688_yaw);
-        OLED_ShowString(5*8,0,oled_buffer,16);
-        
-        sprintf((char *)oled_buffer, "%x", Digtal);
-        OLED_ShowString(5*8,2,oled_buffer,16);
+        /* 行驶时间计时 */
+        {
+            static uint32_t track_start_ms = 0;
+            static uint8_t  time_prev_start = 0;
+            if (!time_prev_start && key.start) track_start_ms = test_ms;  /* 上升沿记录起始时间 */
+            time_prev_start = key.start;
+            if (key.start)
+                sprintf((char *)oled_buffer, "%.1f", (test_ms - track_start_ms) / 1000.0f);
+            else
+                sprintf((char *)oled_buffer, "0.0");
+            OLED_ShowString(5*8,0,oled_buffer,16);
+        }
         
         sprintf((char *)oled_buffer, "%d", key.quan);
         OLED_ShowString(5*8,4,oled_buffer,16);
@@ -115,46 +95,44 @@ int main(void)
 
         key_work();
 
-        //视觉颜色识别
-        Vision_Poll();
-        Vision_Apply();
 
-        // 蓝牙命令处理
-        BLE_Poll();
-        if (BLE_FrameAvailable()) {
-            uint8_t buf[128];
-            uint16_t len = BLE_ReadFrame(buf, sizeof(buf));
-            ble_cmd_dispatch(buf, len);
+
+        /* 读取红外循迹传感器，构建 Digtal（0=黑线, 1=白） */
+        {
+            uint8_t ir[8];
+            IR_Read(ir);
+            Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
+                   | (ir[4]<<3) | (ir[5]<<2) | (ir[6]<<1) | (ir[7]<<0);
         }
 
+        Get_err2();   /* 更新 err2，供 Err2() 返回 */
 
-        No_Mcu_Ganv_Sensor_Task_Without_tick(&sensor);
-		//获取传感器数字量结果(只有当有黑白值传入进去了之后才会有这个值！！)
-		Digtal=Get_Digtal_For_User(&sensor);
-        Get_err2();   /* 更新 err2、black_detected */
+        sprintf((char *)oled_buffer, "%02X", Digtal);
+        OLED_ShowString(5*8,2,oled_buffer,16);
 
-        /* ——— 自动切换：BLE控制下检测到黑线 → 接管为本地循迹 ——— */
-        if (g_ctrl_source == CTRL_SRC_BLE && black_detected && base_speed > 0) {
-            g_ctrl_source = CTRL_SRC_LOCAL_TRACK;
-            Tracking_SpeedLoop_Reset();
-        }
-
-        /* ——— 根据控制源执行速度逻辑 ——— */
-        if (key.start && turn_state == TURN_IDLE) {
-            /* 非远程控制时，按键调速 */
-            if (g_ctrl_source != CTRL_SRC_BLE &&
-                g_ctrl_source != CTRL_SRC_LOCAL_VISION) {
-                speed(key.keyspeed);
-            }
-
-            /* 本地循迹：PID 计算差速 → 写入 g_target_speed_L/R */
-            if (g_ctrl_source == CTRL_SRC_LOCAL_TRACK) {
-                Tracking_SpeedLoop(Err2(), (float)base_speed);
-            }
-        } else if (!key.start) {
+        /* 循迹环：按键2（start）控制启停 */
+        if (key.start) {
+            speed(key.keyspeed);                                  /* 按键调速 → base_speed */
+            Tracking_SpeedLoop(Err2(), (float)base_speed);        /* 误差 → 左右目标速度 */
+        } else {
             g_target_speed_L = 0.0f;
             g_target_speed_R = 0.0f;
         }
+
+        /* 权重法停车：多路见黑 + 误差接近0（黑线居中） */
+        {
+            uint8_t cnt = 0;
+            for (uint8_t i = 0; i < 8; i++) {
+                if (!(Digtal & (1 << i))) cnt++;
+            }
+            if (cnt >= 7 && abs(Err2()) <= 1) {
+                motor_stop();       /* 急刹 + 清零积分 */
+                key.start = 0;      /* 关闭总开关，防止循迹环重启 */
+            }
+        }
+
+        last_start = key.start;  /* 保存本次状态，用于上升沿检测 */
+
 
         //mspm0_delay_ms(1000);
 
