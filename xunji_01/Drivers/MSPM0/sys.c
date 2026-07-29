@@ -19,7 +19,7 @@ void speed(uint8_t keyspeed)
     else if (keyspeed == 4) base_speed = 450;    /* 0.45 m/s */
     else if (keyspeed == 3) base_speed = 300;    /* 0.30 m/s */
     else if (keyspeed == 2) base_speed = 200;    /* 0.20 m/s */
-    else if (keyspeed == 1) base_speed = 100;    /* 0.10 m/s */
+    else if (keyspeed == 1) base_speed = 150;    /* 0.15 m/s（原100的1.5倍） */
     else                    base_speed = 0;      /* 停车 */
 }
 

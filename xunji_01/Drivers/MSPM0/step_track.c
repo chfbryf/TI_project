@@ -2,7 +2,7 @@
  * @file    step_track.c
  * @brief   步进电机循迹控制实现
  *
- * IR 灰度传感器误差 → PD 差速计算 → 步进电机直驱
+ * IR 灰度传感器误差 → P 差速计算 → 步进电机直驱
  */
 
 #include "step_track.h"
@@ -13,8 +13,9 @@
 #include <math.h>
 
 /* ---------- 内部状态 ---------- */
-static int16_t last_error;  /* 上一拍误差（D项用） */
-static float   error_sum;   /* 误差累积（I项用） */
+static float ramp_speed;  /* 缓启动当前速度 */
+
+#define RAMP_STEP   10.0f   /* 每次迭代增加 10 mm/s */
 
 /* ---------- 辅助函数 ---------- */
 
@@ -30,16 +31,12 @@ static float mmps_to_dps(float mmps)
 
 void StepTrack_Init(void)
 {
-    last_error = 0;
-    error_sum  = 0.0f;
 }
 
 void StepTrack_Stop(void)
 {
     step_motor_stop(1);
     step_motor_stop(2);
-    last_error = 0;
-    error_sum  = 0.0f;
 }
 
 /**
@@ -54,25 +51,24 @@ void StepTrack_Run(void)
     if (!key.start) {
         step_motor_continuous_run(1, 0.0f);
         step_motor_continuous_run(2, 0.0f);
-        last_error = 0;
-        error_sum  = 0.0f;
+        ramp_speed = 0.0f;
         return;
     }
 
     speed(key.keyspeed);
-    float base_dps = mmps_to_dps((float)base_speed);
+
+    /* 缓启动：逐步逼近目标速度 */
+    if (ramp_speed < (float)base_speed) {
+        ramp_speed += RAMP_STEP;
+        if (ramp_speed > (float)base_speed) ramp_speed = (float)base_speed;
+    }
+
+    float base_dps = mmps_to_dps(ramp_speed);
 
     int16_t error = Err2();
     float err_norm = error / 7.0f;
 
-    /* 积分抗饱和：误差反向时清零积分，避免过冲 */
-    if (error * last_error <= 0) error_sum = 0.0f;
-    error_sum += err_norm;
-
-    float diff = base_dps * (TRACK_KP * err_norm
-                           + TRACK_KI * error_sum
-                           + TRACK_KD * (err_norm - last_error / 7.0f));
-    last_error = error;
+    float diff = base_dps * TRACK_KP * err_norm;
 
     step_motor_continuous_run(1, base_dps + diff);
     step_motor_continuous_run(2, base_dps - diff);

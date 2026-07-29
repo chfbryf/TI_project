@@ -38,6 +38,8 @@
  * ================================================================ */
 static uint8_t  time_prev_start = 0;  /* key.start 上升沿检测 */
 static uint32_t track_start_ms  = 0;  /* 行驶起始时间 */
+static uint8_t  track_stopped   = 0;  /* 停车标志 */
+static float    track_final_sec = 0;  /* 停车时刻保留的时间 */
 volatile uint32_t test_ms = 0;       /* 1ms 计数器 */
 static char oled_buf[16];
 
@@ -46,10 +48,21 @@ static char oled_buf[16];
  * ================================================================ */
 static void OLED_UpdateStatus(void)
 {
-    /* 循迹时间：按键启动后计时 */
-    if (!time_prev_start && key.start) track_start_ms = test_ms;
+    /* 循迹时间：按键启动后计时，停车后保留 */
+    if (!time_prev_start && key.start) {
+        track_start_ms = test_ms;
+        track_stopped   = 0;
+    }
     time_prev_start = key.start;
-    float sec = key.start ? (test_ms - track_start_ms) / 1000.0f : 0.0f;
+
+    float sec;
+    if (track_stopped) {
+        sec = track_final_sec;
+    } else if (key.start) {
+        sec = (test_ms - track_start_ms) / 1000.0f;
+    } else {
+        sec = 0.0f;
+    }
 
     sprintf(oled_buf, "%.1fs", sec);
     OLED_ShowString(0, 0, (uint8_t *)oled_buf, 16);
@@ -85,15 +98,35 @@ static uint8_t SensorUpdate(void)
  * ================================================================ */
 static uint8_t CheckStop(uint8_t d)
 {
-    uint8_t cnt = 0;
-    for (uint8_t i = 0; i < 8; i++) {
-        if (!(d & (1 << i))) cnt++;
+    static uint8_t  black_seen    = 0;
+    static uint32_t window_start  = 0;
+
+    if (!key.start) {                      /* 未启动时清空窗口，避免误触发 */
+        black_seen   = 0;
+        window_start = 0;
+        return 0;
     }
-    if (cnt >= 7 && abs(Err2()) <= 1) {
-        StepTrack_Stop();
-        key.start = 0;
-        return 1;
+
+    black_seen |= ~d;                      /* 累积本窗口内见过的黑线位置 */
+
+    if (test_ms - window_start >= 100) {   /* 100ms 窗口到 */
+        uint8_t cnt = 0;
+        for (uint8_t i = 0; i < 8; i++) {
+            if (black_seen & (1 << i)) cnt++;
+        }
+        if (cnt >= 5) {
+            track_final_sec = (test_ms - track_start_ms) / 1000.0f;
+            track_stopped = 1;
+            StepTrack_Stop();
+            key.start = 0;
+            return 1;
+        }
+        /* 重置窗口 */
+        black_seen   = 0;
+        window_start = test_ms;
     }
+
+    if (window_start == 0) window_start = test_ms;
     return 0;
 }
 

@@ -16,9 +16,7 @@
 #define WHEEL_DIAMETER_MM   65.0f   /* 轮径 mm */
 
 /* ---------- PID 增益 ---------- */
-#define TRACK_KP            0.55f    /* P 增益（误差归一化后占基础速度的比例） */
-#define TRACK_KI            0.0f   /* I 增益（积分项，消除稳态误差） */
-#define TRACK_KD            0.0675f    /* D 增益（微分项，抑制震荡） */
+#define TRACK_KP            0.3825f    /* P 增益（误差归一化后占基础速度的比例） */
 
 void StepTrack_Init(void);
 void StepTrack_Stop(void);
