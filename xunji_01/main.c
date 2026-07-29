@@ -176,15 +176,15 @@ int main(void)
 
         uint8_t d = SensorUpdate();     /* 2. IR 传感器 + 误差 */
 
-        /* 减速阶段：0.5s 匀速降速至 0 */
+        /* 减速阶段：1s 匀速降速至 0 */
         if (decelerating) {
             uint32_t elapsed = test_ms - decel_start_ms;
-            if (elapsed >= 500) {
+            if (elapsed >= 1000) {
                 step_motor_stop(1);
                 step_motor_stop(2);
                 decelerating = 0;
             } else {
-                float frac = 1.0f - (float)elapsed / 500.0f;
+                float frac = 1.0f - (float)elapsed / 1000.0f;
                 float cur_speed = decel_start_spd * frac;
                 float cur_dps = (cur_speed * 360.0f) / (3.1415926f * 65.0f);
                 int16_t error = Err2();
