@@ -89,6 +89,12 @@ static uint8_t SensorUpdate(void)
     IR_Read(ir);
     Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
            | (ir[4]<<3) | (ir[5]<<2) | (ir[6]<<1) | (ir[7]<<0);
+
+    /* 消抖：最右边传感器(bit0)必须在旁边传感器(bit1)也见黑时才有效 */
+    if ((Digtal & 0x02) != 0x00) {   /* bit1 = 白 */
+        Digtal |= 0x01;               /* 强制 bit0 = 白，滤除闪烁 */
+    }
+
     Get_err2();
     return Digtal;
 }
