@@ -4,30 +4,18 @@
 #include "ti_msp_dl_config.h"
 #include "main.h"
 #include <stdio.h>
-#include "encoder.h"
-#include "motor.h"
 #include "key.h"
 #include <stdint.h>
 #include "ir_tracking.h"
 #include "sensor2.h"
-#include "speed_ctrl.h"
 #include <math.h>
 #include "icm42688.h"
-#include "servo.h"
-#include "renwu.h"
+#include "step_motor.h"
+#include "step_track.h"
 
 
 /* 编译模式切换：0=从机  1=主机 */
 #define HOST_MODE  0
-
-#define AIN1_High       DL_GPIO_setPins(DIR_AIN1_PORT, DIR_AIN1_PIN)
-#define AIN1_Low        DL_GPIO_clearPins(DIR_AIN1_PORT, DIR_AIN1_PIN)
-#define AIN2_High       DL_GPIO_setPins(DIR_AIN2_PORT, DIR_AIN2_PIN)
-#define AIN2_Low        DL_GPIO_clearPins(DIR_AIN2_PORT, DIR_AIN2_PIN)
-#define BIN1_High       DL_GPIO_setPins(DIR_BIN1_PORT, DIR_BIN1_PIN)
-#define BIN1_Low        DL_GPIO_clearPins(DIR_BIN1_PORT, DIR_BIN1_PIN)
-#define BIN2_High       DL_GPIO_setPins(DIR_BIN2_PORT, DIR_BIN2_PIN)
-#define BIN2_Low        DL_GPIO_clearPins(DIR_BIN2_PORT, DIR_BIN2_PIN)
 
 
 #define LED3_High        DL_GPIO_setPins(LED_PORT, LED_LED3_PIN)

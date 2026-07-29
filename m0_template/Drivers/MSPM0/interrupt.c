@@ -5,7 +5,7 @@ uint8_t enable_group1_irq = 0;
 
 void Interrupt_Init(void)
 {
-    /* 无条件使能编码器中断，不再依赖 enable_group1_irq */
+    /* 使能 GPIO 组中断（ICM42688 INT1 等） */
     #if defined GPIO_MULTIPLE_GPIOA_INT_IRQN
     NVIC_EnableIRQ(GPIO_MULTIPLE_GPIOA_INT_IRQN);
     #endif
@@ -114,9 +114,6 @@ void UART_WIT_INST_IRQHandler(void)
 
 void GROUP1_IRQHandler(void)
 {
-    /* 执行编码器采集 */
-    Encodering();
-
     switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1)) {
         #if defined GPIO_MULTIPLE_GPIOA_INT_IIDX
         case GPIO_MULTIPLE_GPIOA_INT_IIDX:
@@ -201,24 +198,3 @@ void GROUP1_IRQHandler(void)
             break;
     }
 }
-
-/* ================================================================
- * SPEED_PID 定时器中断（TIMG6，50ms）
- *
- * 对标参考工程 MOTOR_PID_INST_IRQHandler：
- * 仅负责编码器测速（Encoder_UpdateSpeeds）。
- * 速度环 SpeedCtrl_Update 由 main() 主循环统一调度。 */
-#if defined(SPEED_PID_INST_IRQHandler)
-void SPEED_PID_INST_IRQHandler(void)
-{
-    switch (DL_TimerG_getPendingInterrupt(SPEED_PID_INST))
-    {
-    case DL_TIMERG_IIDX_LOAD:
-        Encoder_UpdateSpeeds();
-        SpeedCtrl_Update(g_target_speed_L, g_target_speed_R);
-        break;
-    default:
-        break;
-    }
-}
-#endif
