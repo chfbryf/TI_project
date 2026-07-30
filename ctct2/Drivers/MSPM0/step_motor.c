@@ -218,7 +218,7 @@ void step_motor_continuous_run(uint8_t stepper_id, float speed_dps)
     /* 方向 */
     uint8_t direction = (speed_dps >= 0.0f) ? 1 : 0;
     /* 右电机对装, DIR 取反 */
-    if (stepper_id == 2) direction = !direction;
+    if (stepper_id == 2 || stepper_id == 3) direction = !direction;
 
     /* 先更新方向，再更新速度 */
     step_motor_dir_set(direction, stepper_id);

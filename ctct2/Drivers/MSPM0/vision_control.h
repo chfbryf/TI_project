@@ -20,14 +20,14 @@
  *  PD + 前馈 参数
  * ═══════════════════════════════════════════════════════════════ */
 
-/* 比例增益: 1cm误差 → P*1 deg/s 修正速度，调大=响应快, 调小=平稳 */
-#define VC_P_GAIN              5.0f
+// /* 比例增益: 1cm误差 → P*1 deg/s 修正速度，调大=响应快, 调小=平稳 */
+#define VC_P_GAIN 2.950f
 
 /* 微分增益: 阻尼预测, 抑制超调 */
-#define VC_D_GAIN               0.0f
+#define VC_D_GAIN      0.0f
 
 /* 前馈增益: 钢珠1cm/s → 需要多少deg/s电机速度去抵消 */
-#define VC_FF_VEL_GAIN         1.0f
+#define VC_FF_VEL_GAIN     0.0f
 
 /* 输出限幅: 电机最大角速度 (deg/s) */
 #define VC_MAX_SPEED_DPS       150.0f
@@ -36,7 +36,24 @@
 #define VC_EMA_ALPHA           0.8f
 
 /* 钢珠速度 EMA 滤波系数 */
-#define VC_VEL_EMA_BETA        0.6f
+#define VC_VEL_EMA_BETA       0.6f
+/* 比例增益: 1cm误差 → P*1 deg/s 修正速度，调大=响应快, 调小=平稳 */
+// #define VC_P_GAIN 15.0f
+
+// /* 微分增益: 阻尼预测, 抑制超调 */
+// #define VC_D_GAIN      1.5f
+
+// /* 前馈增益: 钢珠1cm/s → 需要多少deg/s电机速度去抵消 */
+// #define VC_FF_VEL_GAIN      0.0f
+
+// /* 输出限幅: 电机最大角速度 (deg/s) */
+// #define VC_MAX_SPEED_DPS       150.0f
+
+// /* 视觉距离 EMA 滤波系数 (0~1, 越大响应越快但噪声越大) */
+// #define VC_EMA_ALPHA           0.8f
+
+// /* 钢珠速度 EMA 滤波系数 */
+// #define VC_VEL_EMA_BETA        0.6f
 
 /* ═══════════════════════════════════════════════════════════════
  *  控制参数
@@ -46,7 +63,7 @@
 #define VC_CONTROL_INTERVAL_MS   30U
 
 /* 死区: |偏差| < 此值 (cm) 电机停转, 防止抖动 */
-#define VC_DEADBAND_CM           0.3f
+#define VC_DEADBAND_CM           1.5f
 
 /* 视觉超时: 超过此时长未收到有效帧视为钢珠丢失 (ms) */
 #define VC_VISION_TIMEOUT_MS   500U
