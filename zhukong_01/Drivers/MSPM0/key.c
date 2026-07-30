@@ -89,8 +89,9 @@ void key_work(void)
 {
     key.keynum = Key_GetNum();
     if (key.keynum == 1) {
-        task_num++;
-        if (task_num > TASK_MAX) task_num = 1;
+        key.keyspeed++;
+        if (key.keyspeed > 5)
+            key.keyspeed = 0;
     }
     if (key.keynum == 2) {
         key.start = 1;

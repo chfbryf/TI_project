@@ -27,7 +27,7 @@
 #define VC_D_GAIN               0.0f
 
 /* 前馈增益: 钢珠1cm/s → 需要多少deg/s电机速度去抵消 */
-#define VC_FF_VEL_GAIN         0.5f
+#define VC_FF_VEL_GAIN         1.0f
 
 /* 输出限幅: 电机最大角速度 (deg/s) */
 #define VC_MAX_SPEED_DPS       150.0f
