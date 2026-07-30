@@ -1,35 +1,3 @@
-/*
- * Copyright (c) 2021, Texas Instruments Incorporated
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * *  Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * *  Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * *  Neither the name of Texas Instruments Incorporated nor the names of
- *    its contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 #include "sys.h"
 #include <stdlib.h>
 
@@ -38,6 +6,11 @@
  * ================================================================ */
 static uint8_t  time_prev_start = 0;  /* key.start 上升沿检测 */
 static uint32_t track_start_ms  = 0;  /* 行驶起始时间 */
+static uint8_t  track_stopped   = 0;  /* 停车标志 */
+static float    track_final_sec = 0;  /* 停车时刻保留的时间 */
+static uint8_t  decelerating    = 0;  /* 减速中标志 */
+static uint32_t decel_start_ms  = 0;  /* 减速起始时间 */
+static float    decel_start_spd = 0;  /* 减速起始速度 */
 volatile uint32_t test_ms = 0;       /* 1ms 计数器 */
 static char oled_buf[16];
 
@@ -46,19 +19,35 @@ static char oled_buf[16];
  * ================================================================ */
 static void OLED_UpdateStatus(void)
 {
-    /* 循迹时间：按键启动后计时 */
-    if (!time_prev_start && key.start) track_start_ms = test_ms;
+    /* 循迹时间：按键启动后计时，停车后保留 */
+    if (!time_prev_start && key.start) {
+        track_start_ms = test_ms;
+        track_stopped   = 0;
+    }
     time_prev_start = key.start;
-    float sec = key.start ? (test_ms - track_start_ms) / 1000.0f : 0.0f;
 
-    sprintf(oled_buf, "%.1fs Vis:%.1f", sec, vision.distance_cm);
+    float sec;
+    if (track_stopped) {
+        sec = track_final_sec;
+    } else if (key.start) {
+        sec = (test_ms - track_start_ms) / 1000.0f;
+    } else {
+        sec = 0.0f;
+    }
+
+    /* 第1行：Digtal位图 + 视觉距离 */
+    sprintf(oled_buf, "%02X Vis:%.1f", Digtal, vision.distance_cm);
     OLED_ShowString(0, 0, (uint8_t *)oled_buf, 16);
 
-    /* Digtal + 速度 */
-    sprintf(oled_buf, "%02X Spd:%d", Digtal, key.keyspeed);
+    /* 第2行：行驶时间 */
+    sprintf(oled_buf, "%.1fs", sec);
     OLED_ShowString(0, 2, (uint8_t *)oled_buf, 16);
 
-    /* 按键3：圈数 */
+    /* 第3行：速度档位 */
+    sprintf(oled_buf, "Spd:%d", key.keyspeed);
+    OLED_ShowString(0, 4, (uint8_t *)oled_buf, 16);
+
+    /* 第4行：圈数 */
     sprintf(oled_buf, "Lap:%d", key.quan);
     OLED_ShowString(0, 6, (uint8_t *)oled_buf, 16);
 }
@@ -68,10 +57,22 @@ static void OLED_UpdateStatus(void)
  * ================================================================ */
 static uint8_t SensorUpdate(void)
 {
+    static uint8_t ir7_db_cnt = 0;
+
     uint8_t ir[8] = {1, 1, 1, 1, 1, 1, 1, 1};  /* 默认全白，防止首帧未到 */
     IR_Read(ir);
+
+    /* 最右边传感器单独消抖：连续3帧见黑才有效 */
+    if (ir[7] == 0) {
+        if (ir7_db_cnt < 3) ir7_db_cnt++;
+    } else {
+        ir7_db_cnt = 0;
+    }
+    ir[7] = (ir7_db_cnt >= 3) ? 0 : 1;
+
     Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
            | (ir[4]<<3) | (ir[5]<<2) | (ir[6]<<1) | (ir[7]<<0);
+
     Get_err2();
     return Digtal;
 }
@@ -81,15 +82,37 @@ static uint8_t SensorUpdate(void)
  * ================================================================ */
 static uint8_t CheckStop(uint8_t d)
 {
-    uint8_t cnt = 0;
-    for (uint8_t i = 0; i < 8; i++) {
-        if (!(d & (1 << i))) cnt++;
+    static uint8_t  black_seen    = 0;
+    static uint32_t window_start  = 0;
+
+    if (!key.start) {                      /* 未启动时清空窗口，避免误触发 */
+        black_seen   = 0;
+        window_start = 0;
+        return 0;
     }
-    if (cnt >= 7 && abs(Err2()) <= 1) {
-        StepTrack_Stop();
-        key.start = 0;
-        return 1;
+
+    black_seen |= ~d;                      /* 累积本窗口内见过的黑线位置 */
+
+    if (test_ms - window_start >= 100) {   /* 100ms 窗口到 */
+        uint8_t cnt = 0;
+        for (uint8_t i = 0; i < 8; i++) {
+            if (black_seen & (1 << i)) cnt++;
+        }
+        if (cnt >= 5 && (test_ms - track_start_ms) >= 18000) {
+            track_final_sec = (test_ms - track_start_ms) / 1000.0f;
+            track_stopped = 1;
+            decelerating   = 1;
+            decel_start_ms = test_ms;
+            decel_start_spd = (float)base_speed;
+            key.start = 0;
+            return 1;
+        }
+        /* 重置窗口 */
+        black_seen   = 0;
+        window_start = test_ms;
     }
+
+    if (window_start == 0) window_start = test_ms;
     return 0;
 }
 
@@ -126,6 +149,26 @@ int main(void)
         key_work();                     /* 1. 按键扫描 */
 
         uint8_t d = SensorUpdate();     /* 2. IR 传感器 + 误差 */
+
+        /* 减速阶段：1s 匀减速至 0 */
+        if (decelerating) {
+            uint32_t elapsed = test_ms - decel_start_ms;
+            if (elapsed >= 1000) {
+                step_motor_stop(1);
+                step_motor_stop(2);
+                decelerating = 0;
+            } else {
+                float frac = 1.0f - (float)elapsed / 1000.0f;
+                float cur_speed = decel_start_spd * frac;
+                float cur_dps = (cur_speed * 360.0f) / (3.1415926f * 65.0f);
+                int16_t error = Err2();
+                float diff = cur_dps * TRACK_KP * (error / 7.0f);
+                step_motor_continuous_run(1, cur_dps + diff);
+                step_motor_continuous_run(2, cur_dps - diff);
+            }
+            OLED_UpdateStatus();            /* 仍刷新 OLED */
+            continue;
+        }
 
         OLED_UpdateStatus();            /* 4. OLED: 时间 / Digtal / Spd / Lap */
 
