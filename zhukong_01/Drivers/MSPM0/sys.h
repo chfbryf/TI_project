@@ -13,6 +13,7 @@
 #include "step_track.h"
 #include "vision.h"
 #include "vision_control.h"
+#include "task.h"
 
 
 /* 编译模式切换：0=从机  1=主机 */

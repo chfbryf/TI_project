@@ -43,8 +43,8 @@ static void OLED_UpdateStatus(void)
     sprintf(oled_buf, "%.1fs", sec);
     OLED_ShowString(0, 2, (uint8_t *)oled_buf, 16);
 
-    /* 第3行：速度档位 */
-    sprintf(oled_buf, "Spd:%d", key.keyspeed);
+    /* 第3行：任务号 */
+    sprintf(oled_buf, "T:%d Spd:160", task_num);
     OLED_ShowString(0, 4, (uint8_t *)oled_buf, 16);
 
     /* 第4行：圈数 */
@@ -93,12 +93,12 @@ static uint8_t CheckStop(uint8_t d)
 
     black_seen |= ~d;                      /* 累积本窗口内见过的黑线位置 */
 
-    if (test_ms - window_start >= 100) {   /* 100ms 窗口到 */
+    if (test_ms - window_start >= 250) {   /* 100ms 窗口到 */
         uint8_t cnt = 0;
         for (uint8_t i = 0; i < 8; i++) {
             if (black_seen & (1 << i)) cnt++;
         }
-        if (cnt >= 5 && (test_ms - track_start_ms) >= 18000) {
+        if (cnt >= 4 && (test_ms - track_start_ms) >= 18000) {
             track_final_sec = (test_ms - track_start_ms) / 1000.0f;
             track_stopped = 1;
             decelerating   = 1;
@@ -126,11 +126,12 @@ int main(void)
     SysTick_Init();
     OLED_Init();
 
-    /* 步进电机 + 循迹 + 视觉 */
+    /* 步进电机 + 循迹 + 视觉 + 任务 */
     step_motor_Init();
     StepTrack_Init();
     Vision_Init();
     VisionControl_Init();
+    Task_Init();
 
     /* LED */
     LED4_High;
@@ -177,6 +178,8 @@ int main(void)
         StepTrack_Run();                /* 6. 步进电机循迹 */
 
         VisionControl_Run();            /* 7. 视觉推杆控制 */
+
+        Task_Run();                     /* 8. 任务调度 */
     }
 }
 

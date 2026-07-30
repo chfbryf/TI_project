@@ -15,12 +15,8 @@ volatile unsigned char Digtal;
  */
 void speed(uint8_t keyspeed)
 {
-    if (keyspeed == 5)      base_speed = 600;    /* 0.60 m/s（全速） */
-    else if (keyspeed == 4) base_speed = 450;    /* 0.45 m/s */
-    else if (keyspeed == 3) base_speed = 300;    /* 0.30 m/s */
-    else if (keyspeed == 2) base_speed = 200;    /* 0.20 m/s */
-    else if (keyspeed == 1) base_speed = 100;    /* 0.10 m/s */
-    else                    base_speed = 0;      /* 停车 */
+    (void)keyspeed;                    /* 固定速度，不依赖按键档位 */
+    base_speed = 160;                  /* 0.16 m/s */
 }
 
 /**

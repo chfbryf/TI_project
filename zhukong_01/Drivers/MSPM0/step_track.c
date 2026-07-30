@@ -15,8 +15,6 @@
 /* ---------- 内部状态 ---------- */
 static float ramp_speed;  /* 缓启动当前速度 */
 
-#define RAMP_STEP   10.0f   /* 每次迭代增加 10 mm/s */
-
 /* ---------- 辅助函数 ---------- */
 
 /**
@@ -57,9 +55,11 @@ void StepTrack_Run(void)
 
     speed(key.keyspeed);
 
-    /* 缓启动：逐步逼近目标速度 */
+    /* 缓启动：1秒内线性加速到目标速度 */
     if (ramp_speed < (float)base_speed) {
-        ramp_speed += RAMP_STEP;
+        float ramp_step = (float)base_speed * 0.03f;  /* 每约30ms迭代，33轮≈1s */
+        if (ramp_step < 1.0f) ramp_step = 1.0f;       /* 低速时下限，防止爬行 */
+        ramp_speed += ramp_step;
         if (ramp_speed > (float)base_speed) ramp_speed = (float)base_speed;
     }
 
