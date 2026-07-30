@@ -1,14 +1,10 @@
 /**
  * @file    vision_control.c
- * @brief   视觉坐标 → 电机3 PD + 前馈控制
+ * @brief   视觉坐标 → 电机3 PD + 速度耦合控制
  *
- * 控制链路:
- *   视觉 distance_cm ─→ EMA滤波 ─→ 误差 + 钢珠速度
- *           ─→ PD反馈 + 前馈 ─→ step_motor_continuous_run(3, speed)
- *
- * 公式: output = P*error + D*derror/dt + FF*ball_velocity
- *   反馈: 根据位置偏差追赶
- *   前馈: 根据钢珠速度提前补偿，减少滞后
+ * 公式: error = coupled_target - distance
+ *       coupled_target = target + k_couple * ball_vel
+ *       output = P*error + D*derror/dt
  *
  * 机械参数: 电机转 160° → 推杆动 52mm → 杆子摆动
  */
@@ -51,7 +47,7 @@ void VisionControl_Init(void)
     ema_initialized   = false;
     calib_count       = 0;
     calib_sum         = 0.0f;
-    calib_done        = false;
+    calib_done        = true;   /* 跳过自动标定, 固定 11.1cm */
 }
 
 /* ================================================================
@@ -121,33 +117,29 @@ void VisionControl_Run(void)
                      + (1.0f - VC_VEL_EMA_BETA) * ema_ball_vel;
     }
 
-    /* ── 7. 计算误差 (用滤波后的距离) ── */
-    float error = target_cm - ema_distance_cm;
+    /* ── 7. PD + 速度耦合控制 ── */
+    /* 速度耦合: 球速修正目标位置, 提前预判刹车 */
+    float coupled_target = target_cm + VC_VEL_COUPLE_GAIN * ema_ball_vel;
+    float error = coupled_target - ema_distance_cm;
 
-    /* ── 8. 死区 ── */
+    /* 死区 */
     if (fabsf(error) < VC_DEADBAND_CM) {
         step_motor_continuous_run(3, 0.0f);
         last_error_cm = error;
         return;
     }
 
-    /* ── 9. PD 反馈 + 前馈 ── */
+    /* PD计算 */
     float derivative = (error - last_error_cm) / dt;
     last_error_cm = error;
 
-    /* 反馈项: 根据位置偏差追赶 */
-    float feedback = VC_P_GAIN * error + VC_D_GAIN * derivative;
+    float output = VC_P_GAIN * error + VC_D_GAIN * derivative;
 
-    /* 前馈项: 根据钢珠速度预判，提前补偿 */
-    float feedforward = VC_FF_VEL_GAIN * ema_ball_vel;
-
-    float output = feedback - feedforward;
-
-    /* ── 10. 限幅 ── */
+    /* 限幅 */
     if (output >  VC_MAX_SPEED_DPS) output =  VC_MAX_SPEED_DPS;
     if (output < -VC_MAX_SPEED_DPS) output = -VC_MAX_SPEED_DPS;
 
-    /* ── 11. 驱动电机（方向修正用 VC_DIR_SIGN） ── */
+    /* 驱动电机 */
     step_motor_continuous_run(3, output * VC_DIR_SIGN);
 }
 
