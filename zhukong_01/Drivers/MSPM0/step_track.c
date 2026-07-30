@@ -55,8 +55,6 @@ void StepTrack_Run(void)
         return;
     }
 
-    speed(key.keyspeed);
-
     /* 缓启动：逐步逼近目标速度 */
     if (ramp_speed < (float)base_speed) {
         ramp_speed += RAMP_STEP;

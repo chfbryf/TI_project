@@ -5,7 +5,7 @@
 
 /* 按键数据结构 */
 typedef struct {
-    volatile uint8_t  keyspeed;
+    volatile uint8_t  task_id;
     volatile uint8_t  quan;
     volatile uint8_t  keynum;
     volatile uint8_t  start;

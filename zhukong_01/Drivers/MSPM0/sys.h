@@ -15,6 +15,8 @@
 #include "vision_control.h"
 
 
+#include "task.h"
+
 /* 编译模式切换：0=从机  1=主机 */
 #define HOST_MODE  0
 
@@ -36,7 +38,7 @@ extern volatile uint8_t  quanshu;
 extern volatile uint32_t delay_flag;
 extern volatile unsigned char Digtal;
 
-void speed(uint8_t keyspeed);
+void speed(void);
 
 
 #endif

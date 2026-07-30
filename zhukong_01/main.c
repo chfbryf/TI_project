@@ -43,8 +43,8 @@ static void OLED_UpdateStatus(void)
     sprintf(oled_buf, "%.1fs", sec);
     OLED_ShowString(0, 2, (uint8_t *)oled_buf, 16);
 
-    /* 第3行：速度档位 */
-    sprintf(oled_buf, "Spd:%d", key.keyspeed);
+    /* 第3行：当前任务 */
+    sprintf(oled_buf, "Tsk:%d", key.task_id);
     OLED_ShowString(0, 4, (uint8_t *)oled_buf, 16);
 
     /* 第4行：圈数 */
@@ -131,6 +131,10 @@ int main(void)
     StepTrack_Init();
     Vision_Init();
     VisionControl_Init();
+    Task_Init();
+
+    /* 按键默认值 */
+    key.task_id = 1;
 
     /* LED */
     LED4_High;

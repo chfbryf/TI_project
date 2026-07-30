@@ -2,25 +2,19 @@
 /* 跨模块全局变量定义 */
 
 key_t key;
-volatile int16_t  base_speed;
+volatile int16_t  base_speed = 160;
 volatile uint8_t mode;
 volatile uint8_t omega_flag;
 volatile uint32_t delay_flag;
 volatile unsigned char Digtal;
 
 /**
- * @brief 根据按键档位设置目标速度
- * @param keyspeed 速度档位（0~5），0为停车
- * @note  base_speed 单位为 mm/s
+ * @brief 固定默认速度，上电后按按键2直接开始循迹
+ * @note  base_speed 单位为 mm/s，固定为 0.16 m/s
  */
-void speed(uint8_t keyspeed)
+void speed(void)
 {
-    if (keyspeed == 5)      base_speed = 600;    /* 0.60 m/s（全速） */
-    else if (keyspeed == 4) base_speed = 450;    /* 0.45 m/s */
-    else if (keyspeed == 3) base_speed = 300;    /* 0.30 m/s */
-    else if (keyspeed == 2) base_speed = 200;    /* 0.20 m/s */
-    else if (keyspeed == 1) base_speed = 100;    /* 0.10 m/s */
-    else                    base_speed = 0;      /* 停车 */
+    base_speed = 160;    /* 0.16 m/s */
 }
 
 /**
