@@ -5,12 +5,12 @@
  * 全局变量
  * ================================================================ */
 static uint8_t  time_prev_start = 0;  /* key.start 上升沿检测 */
-static uint32_t track_start_ms  = 0;  /* 行驶起始时间 */
-static uint8_t  track_stopped   = 0;  /* 停车标志 */
-static float    track_final_sec = 0;  /* 停车时刻保留的时间 */
-static uint8_t  decelerating    = 0;  /* 减速中标志 */
-static uint32_t decel_start_ms  = 0;  /* 减速起始时间 */
-static float    decel_start_spd = 0;  /* 减速起始速度 */
+uint32_t track_start_ms  = 0;          /* 行驶起始时间 */
+uint8_t  track_stopped   = 0;          /* 停车标志 */
+float    track_final_sec = 0;          /* 停车时刻保留的时间 */
+static uint8_t  decelerating    = 0;   /* 减速中标志 */
+static uint32_t decel_start_ms  = 0;   /* 减速起始时间 */
+static float    decel_start_spd = 0;   /* 减速起始速度 */
 volatile uint32_t test_ms = 0;       /* 1ms 计数器 */
 static char oled_buf[16];
 
@@ -19,8 +19,8 @@ static char oled_buf[16];
  * ================================================================ */
 static void OLED_UpdateStatus(void)
 {
-    /* 循迹时间：按键启动后计时，停车后保留 */
-    if (!time_prev_start && key.start) {
+    /* 循迹时间：Task1/3/4模式下按键启动后计时，停车后保留 */
+    if (!time_prev_start && key.start && (key.task_id == 1 || key.task_id == 3 || key.task_id == 4)) {
         track_start_ms = test_ms;
         track_stopped   = 0;
     }
@@ -29,7 +29,7 @@ static void OLED_UpdateStatus(void)
     float sec;
     if (track_stopped) {
         sec = track_final_sec;
-    } else if (key.start) {
+    } else if (key.start && (key.task_id == 1 || key.task_id == 3 || key.task_id == 4)) {
         sec = (test_ms - track_start_ms) / 1000.0f;
     } else {
         sec = 0.0f;
@@ -47,8 +47,8 @@ static void OLED_UpdateStatus(void)
     sprintf(oled_buf, "Tsk:%d", key.task_id);
     OLED_ShowString(0, 4, (uint8_t *)oled_buf, 16);
 
-    /* 第4行：圈数 */
-    sprintf(oled_buf, "Lap:%d", key.quan);
+    /* 第4行：当前任务名称 */
+    sprintf(oled_buf, "%s", Task_GetName(key.task_id));
     OLED_ShowString(0, 6, (uint8_t *)oled_buf, 16);
 }
 
@@ -57,6 +57,7 @@ static void OLED_UpdateStatus(void)
  * ================================================================ */
 static uint8_t SensorUpdate(void)
 {
+    static uint8_t ir0_db_cnt = 0;
     static uint8_t ir7_db_cnt = 0;
 
     uint8_t ir[8] = {1, 1, 1, 1, 1, 1, 1, 1};  /* 默认全白，防止首帧未到 */
@@ -69,6 +70,19 @@ static uint8_t SensorUpdate(void)
         ir7_db_cnt = 0;
     }
     ir[7] = (ir7_db_cnt >= 3) ? 0 : 1;
+
+    /* 最左边传感器同样消抖：连续3帧见黑才有效 */
+    if (ir[0] == 0) {
+        if (ir0_db_cnt < 3) ir0_db_cnt++;
+    } else {
+        ir0_db_cnt = 0;
+    }
+    ir[0] = (ir0_db_cnt >= 3) ? 0 : 1;
+
+    /* 最左边滤波：仅相邻 ir[1] 也为黑时 ir[0] 黑才有效 */
+    if (ir[0] == 0 && ir[1] != 0) {
+        ir[0] = 1;  /* 孤立黑 → 强制白 */
+    }
 
     Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
            | (ir[4]<<3) | (ir[5]<<2) | (ir[6]<<1) | (ir[7]<<0);
@@ -85,7 +99,7 @@ static uint8_t CheckStop(uint8_t d)
     static uint8_t  black_seen    = 0;
     static uint32_t window_start  = 0;
 
-    if (!key.start) {                      /* 未启动时清空窗口，避免误触发 */
+    if (!key.start || (key.task_id != 1 && key.task_id != 3 && key.task_id != 4)) {   /* Task1/3/4循迹停车 */
         black_seen   = 0;
         window_start = 0;
         return 0;
@@ -93,7 +107,7 @@ static uint8_t CheckStop(uint8_t d)
 
     black_seen |= ~d;                      /* 累积本窗口内见过的黑线位置 */
 
-    if (test_ms - window_start >= 300) {   /* 100ms 窗口到 */
+    if (test_ms - window_start >= 300) {   /* 300ms 窗口到 */
         uint8_t cnt = 0;
         for (uint8_t i = 0; i < 8; i++) {
             if (black_seen & (1 << i)) cnt++;
@@ -134,7 +148,7 @@ int main(void)
     Task_Init();
 
     /* 按键默认值 */
-    key.task_id = 1;
+    key.task_id = 0;
 
     /* LED */
     LED4_High;
@@ -158,6 +172,7 @@ int main(void)
         if (decelerating) {
             step_motor_stop(1);
             step_motor_stop(2);
+            step_motor_stop(3);
             decelerating = 0;
             continue;
         }
@@ -166,11 +181,17 @@ int main(void)
 
         if (CheckStop(d)) continue;     /* 5. 十字停车 */
 
-        StepTrack_Run();                /* 6. 步进电机循迹 */
+        /* 6. 步进电机循迹（仅 Task 1/3/4 需要） */
+        if (key.task_id == 1 || key.task_id == 3 || key.task_id == 4) {
+            StepTrack_Run();
+        }
 
-        VisionControl_Run();            /* 7. 视觉推杆控制 */
+        /* 7. 视觉推杆控制（仅激活中的 Task 2/3/4） */
+        if (Task_IsVisionActive()) {
+            VisionControl_Run();
+        }
 
-        //Task_Run();                     /* 8. 任务调度 */
+        Task_Run();                     /* 8. 任务调度 */
     } 
 }
 

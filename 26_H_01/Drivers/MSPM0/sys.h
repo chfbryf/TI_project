@@ -38,6 +38,11 @@ extern volatile uint8_t  quanshu;
 extern volatile uint32_t delay_flag;
 extern volatile unsigned char Digtal;
 
+/* 循迹任务计时变量（main.c 定义，task.c 使用） */
+extern uint32_t track_start_ms;
+extern uint8_t  track_stopped;
+extern float    track_final_sec;
+
 void speed(void);
 
 

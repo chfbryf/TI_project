@@ -53,19 +53,10 @@
 /* 视觉超时: 超过此时长未收到有效帧视为钢珠丢失 (ms) */
 #define VC_VISION_TIMEOUT_MS   500U
 
-/* 默认目标距离 (cm) — 仅在手动模式下使用 */
+/* 默认目标距离 (cm) */
 #define VC_DEFAULT_TARGET_CM    12.0f
 
-/* ═══════════════════════════════════════════════════════════════
- *  测试序列: 1=启用 先7cm→稳定后→16cm, 0=关闭
- * ═══════════════════════════════════════════════════════════════ */
-#define VC_TEST_SEQ_ENABLE        1
-
-/* 测试序列目标 */
-#define VC_TEST_TARGET_1_CM     7.0f
-#define VC_TEST_TARGET_2_CM    16.0f
-
-/* 自动标定帧数: 上电后用前N帧的平均距离作为目标 */
+/* 自动标定帧数: 上电后用前N帧等待有效数据 */
 #define VC_AUTO_CALIB_FRAMES        3
 
 /* 电机方向: 正转=距离减小, 误差为负时需正向输出 → 1.0f */
@@ -79,6 +70,7 @@ void VisionControl_Init(void);
 void VisionControl_Run(void);
 
 void VisionControl_SetTarget(float target_cm);
+void VisionControl_ResetCalib(void);
 float VisionControl_GetError(void);
 bool  VisionControl_IsStable(void);
 float VisionControl_GetMotorAngle(void);
