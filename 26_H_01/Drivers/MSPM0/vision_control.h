@@ -71,6 +71,7 @@ void VisionControl_Run(void);
 
 void VisionControl_SetTarget(float target_cm);
 void VisionControl_ResetCalib(void);
+bool  VisionControl_IsCalibDone(void);   /* 自动标定是否已完成 */
 float VisionControl_GetError(void);
 bool  VisionControl_IsStable(void);
 float VisionControl_GetMotorAngle(void);

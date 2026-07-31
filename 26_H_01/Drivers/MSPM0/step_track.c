@@ -17,8 +17,6 @@ extern volatile uint32_t test_ms;  /* 1ms 计数器 (main.c) */
 /* ---------- 内部状态 ---------- */
 static float    ramp_speed;      /* 缓启动当前速度 */
 static uint32_t ramp_start_ms;   /* 缓启动起始时间 */
-static float    prev_err_norm;   /* 上一帧归一化误差（用于 D 项） */
-static uint8_t  d_inited;        /* D 项首次初始化标志 */
 
 #define RAMP_TIME_MS  2000U   /* 加速时间 2s */
 
@@ -42,7 +40,6 @@ void StepTrack_Stop(void)
 {
     step_motor_stop(1);
     step_motor_stop(2);
-    d_inited = 0;  /* 下次启动重新初始化 D 项 */
 }
 
 /**
@@ -62,12 +59,13 @@ void StepTrack_Run(void)
         return;
     }
 
-    /* 缓启动：2s 内从 0 加速到 base_speed */
-    if (ramp_speed < (float)base_speed) {
+    /* 缓启动：2s 内从 0 加速到目标速度 */
+    int16_t target_speed = (key.task_id == 1) ? TRACK_SPEED_T1 : TRACK_SPEED_T34;
+    if (ramp_speed < (float)target_speed) {
         if (ramp_start_ms == 0) ramp_start_ms = test_ms;
         float frac = (float)(test_ms - ramp_start_ms) / (float)RAMP_TIME_MS;
         if (frac > 1.0f) frac = 1.0f;
-        ramp_speed = (float)base_speed * frac;
+        ramp_speed = (float)target_speed * frac;
     }
 
     float base_dps = mmps_to_dps(ramp_speed);
@@ -75,16 +73,7 @@ void StepTrack_Run(void)
     int16_t error = Err2();
     float err_norm = error / 7.0f;
 
-    /* D 项：误差变化率，阻尼摆动 */
-    float d_term = 0.0f;
-    if (d_inited) {
-        d_term = TRACK_KD * (err_norm - prev_err_norm);
-    } else {
-        d_inited = 1;
-    }
-    prev_err_norm = err_norm;
-
-    float diff = base_dps * (TRACK_KP * err_norm + d_term);
+    float diff = base_dps * TRACK_KP * err_norm;
 
     step_motor_continuous_run(1, base_dps + diff);
     step_motor_continuous_run(2, base_dps - diff);

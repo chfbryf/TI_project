@@ -14,7 +14,6 @@ typedef enum {
     TASK_2 = 2,
     TASK_3 = 3,
     TASK_4 = 4,
-    TASK_5 = 5,
 } task_id_t;
 
 /* 任务1 阶段（小车循迹） */
@@ -42,11 +41,12 @@ typedef enum {
 /* 任务4 阶段（循迹 + 视觉自动标定） */
 typedef enum {
     T4_STAGE_IDLE     = 0,   /* 等待按键2启动 */
-    T4_STAGE_TRACKING = 1,   /* 正在循迹 + 视觉自动标定 */
-    T4_STAGE_STOPPED  = 2,   /* 已停车 */
+    T4_STAGE_CALIB    = 1,   /* 等待视觉自动标定完成 */
+    T4_STAGE_TRACKING = 2,   /* 正在循迹 + 视觉自动标定 */
+    T4_STAGE_STOPPED  = 3,   /* 已停车 */
 } task4_stage_t;
 
-#define TASK_COUNT  5
+#define TASK_COUNT  4
 
 /* ---------- API ---------- */
 const char* Task_GetName(uint8_t id);   /* 获取任务名称 */

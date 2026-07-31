@@ -34,7 +34,6 @@ static const char* task_names[TASK_COUNT] = {
     "TSK2",
     "TRA2",
     "AUTO",
-    "TSK5",
 };
 
 /* ---------- API 实现 ---------- */
@@ -208,12 +207,19 @@ void Task_Run(void)
             track_stopped = 0;
             if (key.keynum == 2) {
                 VisionControl_ResetCalib();
+                t4_stage  = T4_STAGE_CALIB;  /* 先等标定，不启动小车 */
+            }
+            break;
+
+        /* ── 阶段1: 等待视觉自动标定完成 ── */
+        case T4_STAGE_CALIB:
+            if (VisionControl_IsCalibDone()) {
                 key.start = 1;
                 t4_stage  = T4_STAGE_TRACKING;
             }
             break;
 
-        /* ── 阶段1: 正在循迹 + 视觉自动标定，等待停车 ── */
+        /* ── 阶段2: 正在循迹 + 视觉自动标定，等待停车 ── */
         case T4_STAGE_TRACKING:
             if (track_stopped) {
                 t4_stage  = T4_STAGE_STOPPED;
@@ -227,8 +233,6 @@ void Task_Run(void)
         }
         break;
     }
-    case TASK_5:
-        break;
     default:
         break;
     }

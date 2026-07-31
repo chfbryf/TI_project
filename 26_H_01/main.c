@@ -100,40 +100,61 @@ static uint8_t SensorUpdate(void)
 
 /* ================================================================
  * 十字停车检测
+ * 逻辑：300ms 滑动窗口内，累计 ≥3 路黑的时间 ≥50ms → 停车
+ *      允许短暂掉线不重置，弯道不可能积累到 50ms
  * ================================================================ */
+#define STOP_WINDOW_MS      300    /* 滑动窗口 ms */
+#define STOP_BLACK_MIN      3      /* 最少黑线数 */
+#define STOP_ACCUM_MIN_MS   50     /* 窗口内最少累计黑线时间 ms */
+#define STOP_MIN_RUN_MS     18000  /* 最短运行时间 ms，防起步误判 */
+
 static uint8_t CheckStop(uint8_t d)
 {
-    static uint8_t  black_seen    = 0;
-    static uint32_t window_start  = 0;
+    static uint32_t window_start  = 0;    /* 当前窗口起始时间 */
+    static uint32_t black_acc_ms  = 0;    /* 窗口内累计见黑时间 */
+    static uint32_t last_ms       = 0;    /* 上一帧时间 */
 
-    if (!key.start || (key.task_id != 1 && key.task_id != 3 && key.task_id != 4)) {   /* Task1/3/4循迹停车 */
-        black_seen   = 0;
+    if (!key.start || (key.task_id != 1 && key.task_id != 3 && key.task_id != 4)) {
         window_start = 0;
+        black_acc_ms = 0;
+        last_ms      = 0;
         return 0;
     }
 
-    black_seen |= ~d;                      /* 累积本窗口内见过的黑线位置 */
+    uint32_t now = test_ms;
+    uint32_t dt  = (last_ms > 0) ? (now - last_ms) : 0;
+    last_ms = now;
 
-    if (test_ms - window_start >= 300) {   /* 300ms 窗口到 */
-        uint8_t cnt = 0;
-        for (uint8_t i = 0; i < 8; i++) {
-            if (black_seen & (1 << i)) cnt++;
-        }
-        if (cnt >= 4 && (test_ms - track_start_ms) >= 18000) {
-            track_final_sec = (test_ms - track_start_ms) / 1000.0f;
+    if (window_start == 0) window_start = now;
+
+    /* 统计当前帧有几路见黑（bit=0 为黑线） */
+    uint8_t black_cnt = 0;
+    for (uint8_t i = 0; i < 8; i++) {
+        if (!(d & (1 << i))) black_cnt++;
+    }
+
+    /* 本帧见黑 → 累加时间 */
+    if (black_cnt >= STOP_BLACK_MIN) {
+        black_acc_ms += dt;
+    }
+
+    /* 窗口到期 → 判断 */
+    if (now - window_start >= STOP_WINDOW_MS) {
+        if (black_acc_ms >= STOP_ACCUM_MIN_MS
+            && (now - track_start_ms) >= STOP_MIN_RUN_MS) {
+            track_final_sec = (now - track_start_ms) / 1000.0f;
             track_stopped = 1;
             decelerating   = 1;
-            decel_start_ms = test_ms;
+            decel_start_ms = now;
             decel_start_spd = (float)base_speed;
             key.start = 0;
             return 1;
         }
-        /* 重置窗口 */
-        black_seen   = 0;
-        window_start = test_ms;
+        /* 不满足 → 重置窗口 */
+        window_start = now;
+        black_acc_ms = 0;
     }
 
-    if (window_start == 0) window_start = test_ms;
     return 0;
 }
 

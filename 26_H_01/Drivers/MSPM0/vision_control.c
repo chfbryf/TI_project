@@ -177,3 +177,8 @@ void VisionControl_ResetCalib(void)
     calib_done  = false;
     ema_initialized = false;  /* 重置滤波器，标定后重新初始化 */
 }
+
+bool VisionControl_IsCalibDone(void)
+{
+    return calib_done;
+}

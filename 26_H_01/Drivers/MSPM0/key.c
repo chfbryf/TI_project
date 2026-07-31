@@ -90,7 +90,7 @@ void key_work(void)
     key.keynum = Key_GetNum();
     if (key.keynum == 1) {
         key.task_id++;
-        if (key.task_id > 5)
+        if (key.task_id > 4)
             key.task_id = 1;
     }
     if (key.keynum == 2) {
