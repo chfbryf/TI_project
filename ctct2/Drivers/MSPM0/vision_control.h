@@ -19,13 +19,13 @@
  * ═══════════════════════════════════════════════════════════════ */
 
 /* 比例增益: 1cm误差 → P*1 deg/s 修正速度 */
-#define VC_P_GAIN           9.3f
+#define VC_P_GAIN              8.85f
 
 /* 微分增益: 阻尼抑制超调 */
-#define VC_D_GAIN            15.6f
+#define VC_D_GAIN             17.05f
 
 /* 速度-位置耦合: 球速动态修正目标, 防冲过头 (0=关闭, 负值才正确) */
-#define VC_VEL_COUPLE_GAIN  -0.25f
+#define VC_VEL_COUPLE_GAIN     -0.20f
 
 /* ═══════════════════════════════════════════════════════════════
  *  滤波 & 控制参数
@@ -48,7 +48,7 @@
 #define VC_CONTROL_INTERVAL_MS   30U
 
 /* 死区: |偏差| < 此值 (cm) 电机停转, 防止抖动 */
-#define VC_DEADBAND_CM           0.5f
+#define VC_DEADBAND_CM           1.0f
 
 /* 视觉超时: 超过此时长未收到有效帧视为钢珠丢失 (ms) */
 #define VC_VISION_TIMEOUT_MS   500U
@@ -60,7 +60,7 @@
 #define VC_AUTO_CALIB_FRAMES        3
 
 /* 电机方向: 正转=距离减小, 误差为负时需正向输出 → 1.0f */
-#define VC_DIR_SIGN               1.0f
+#define VC_DIR_SIGN               -1.0f
 
 /* ═══════════════════════════════════════════════════════════════
  *  公开接口
