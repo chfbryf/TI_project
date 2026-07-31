@@ -19,10 +19,10 @@
  * ═══════════════════════════════════════════════════════════════ */
 
 /* 比例增益: 1cm误差 → P*1 deg/s 修正速度 */
-#define VC_P_GAIN              8.87f
+#define VC_P_GAIN              9.13f
 
 /* 微分增益: 阻尼抑制超调 */
-#define VC_D_GAIN             8.92f
+#define VC_D_GAIN             8.972f
 
 /* 速度-位置耦合: 球速动态修正目标, 防冲过头 (0=关闭, 负值才正确) */
 #define VC_VEL_COUPLE_GAIN     -0.35f

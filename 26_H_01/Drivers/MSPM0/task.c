@@ -133,7 +133,7 @@ void Task_Run(void)
         /* ── 阶段1: 先到 7cm ── */
         case T2_STAGE_GOTO_7:
             if (!t2_init) {
-                VisionControl_SetTarget(7.0f);
+                VisionControl_SetTarget(6.0f);
                 t2_init = 1;
             }
             if (VisionControl_IsStable()) {

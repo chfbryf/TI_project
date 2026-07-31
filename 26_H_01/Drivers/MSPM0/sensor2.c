@@ -13,7 +13,7 @@ int16_t err2;
 volatile uint8_t black_detected;
 static int16_t last_valid_err2;   /* 丢线时保持方向用 */
 
-#define BLACK_DEBOUNCE_MS  100
+#define BLACK_DEBOUNCE_MS  0
 
 void Get_err2(void)
 {
