@@ -170,7 +170,7 @@ int main(void)
 
         VisionControl_Run();            /* 7. 视觉推杆控制 */
 
-        Task_Run();                     /* 8. 任务调度 */
+        //Task_Run();                     /* 8. 任务调度 */
     } 
 }
 

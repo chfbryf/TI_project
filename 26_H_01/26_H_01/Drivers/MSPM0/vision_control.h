@@ -19,13 +19,13 @@
  * ═══════════════════════════════════════════════════════════════ */
 
 /* 比例增益: 1cm误差 → P*1 deg/s 修正速度 */
-#define VC_P_GAIN              4.5f
+#define VC_P_GAIN              8.87f
 
 /* 微分增益: 阻尼抑制超调 */
-#define VC_D_GAIN             6.5f
+#define VC_D_GAIN             8.92f
 
 /* 速度-位置耦合: 球速动态修正目标, 防冲过头 (0=关闭, 负值才正确) */
-#define VC_VEL_COUPLE_GAIN     -0.20f
+#define VC_VEL_COUPLE_GAIN     -0.35f
 
 /* ═══════════════════════════════════════════════════════════════
  *  滤波 & 控制参数
@@ -35,7 +35,7 @@
 #define VC_MAX_SPEED_DPS       150.0f
 
 /* 视觉距离 EMA 滤波系数 (0~1, 越小越平滑但延迟越大) */
-#define VC_EMA_ALPHA           0.8f
+#define VC_EMA_ALPHA           0.6f
 
 /* 钢珠速度 EMA 滤波系数 (应 < EMA_ALPHA) */
 #define VC_VEL_EMA_BETA       0.75f
@@ -54,7 +54,16 @@
 #define VC_VISION_TIMEOUT_MS   500U
 
 /* 默认目标距离 (cm) — 仅在手动模式下使用 */
-#define VC_DEFAULT_TARGET_CM    11.1f
+#define VC_DEFAULT_TARGET_CM    12.0f
+
+/* ═══════════════════════════════════════════════════════════════
+ *  测试序列: 1=启用 先7cm→稳定后→16cm, 0=关闭
+ * ═══════════════════════════════════════════════════════════════ */
+#define VC_TEST_SEQ_ENABLE        1
+
+/* 测试序列目标 */
+#define VC_TEST_TARGET_1_CM     7.0f
+#define VC_TEST_TARGET_2_CM    16.0f
 
 /* 自动标定帧数: 上电后用前N帧的平均距离作为目标 */
 #define VC_AUTO_CALIB_FRAMES        3
