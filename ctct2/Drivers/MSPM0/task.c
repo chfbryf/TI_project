@@ -1,12 +1,19 @@
 /**
  * @file    task.c
  * @brief   任务管理模块 - 5个任务的实现框架
+ *
+ * 任务1: 钢珠先到 7cm 稳定, 再到 16cm 稳定
  */
 
 #include "sys.h"
+#include "vision_control.h"
 
 /* ---------- 全局变量定义 ---------- */
 /* task_id 使用 key.task_id，定义在 sys.c 中 */
+
+/* ---------- 任务1 内部状态 ---------- */
+static task1_stage_t t1_stage    = T1_STAGE_GOTO_7;
+static uint8_t       t1_init     = 0;  /* 是否已设置第一个目标 */
 
 /* ---------- 任务名称表 ---------- */
 static const char* task_names[TASK_COUNT] = {
@@ -33,7 +40,8 @@ const char* Task_GetName(uint8_t id)
  */
 void Task_Init(void)
 {
-    /* task_id 已由 main.c 通过 key.task_id = 1 初始化 */
+    t1_stage = T1_STAGE_GOTO_7;
+    t1_init  = 0;
 }
 
 /**
@@ -42,20 +50,42 @@ void Task_Init(void)
 void Task_Run(void)
 {
     switch (key.task_id) {
-    case TASK_1:
-        /* TODO: 任务1 具体行为 */
+    case TASK_1: {
+        switch (t1_stage) {
+
+        /* ── 阶段0: 先到 7cm ── */
+        case T1_STAGE_GOTO_7:
+            if (!t1_init) {
+                VisionControl_SetTarget(7.0f);
+                t1_init = 1;
+            }
+            if (VisionControl_IsStable()) {
+                t1_stage = T1_STAGE_GOTO_16;
+            }
+            break;
+
+        /* ── 阶段1: 再到 16cm ── */
+        case T1_STAGE_GOTO_16:
+            VisionControl_SetTarget(16.0f);
+            if (VisionControl_IsStable()) {
+                t1_stage = T1_STAGE_DONE;
+            }
+            break;
+
+        /* ── 阶段2: 完成 ── */
+        case T1_STAGE_DONE:
+        default:
+            break;
+        }
         break;
+    }
     case TASK_2:
-        /* TODO: 任务2 具体行为 */
         break;
     case TASK_3:
-        /* TODO: 任务3 具体行为 */
         break;
     case TASK_4:
-        /* TODO: 任务4 具体行为 */
         break;
     case TASK_5:
-        /* TODO: 任务5 具体行为 */
         break;
     default:
         break;

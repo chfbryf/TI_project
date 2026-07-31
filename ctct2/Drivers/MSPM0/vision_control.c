@@ -47,7 +47,7 @@ void VisionControl_Init(void)
     ema_initialized   = false;
     calib_count       = 0;
     calib_sum         = 0.0f;
-    calib_done        = true;   /* 跳过自动标定, 固定 11.1cm */
+    calib_done        = false;
 }
 
 /* ================================================================

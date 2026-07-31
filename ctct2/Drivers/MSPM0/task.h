@@ -17,6 +17,13 @@ typedef enum {
     TASK_5 = 5,
 } task_id_t;
 
+/* 任务1 阶段 */
+typedef enum {
+    T1_STAGE_GOTO_7   = 0,   /* 先到 7cm */
+    T1_STAGE_GOTO_16  = 1,   /* 再到 16cm */
+    T1_STAGE_DONE     = 2,   /* 完成 */
+} task1_stage_t;
+
 #define TASK_COUNT  5
 
 /* ---------- API ---------- */

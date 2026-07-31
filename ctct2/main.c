@@ -154,23 +154,11 @@ int main(void)
 
         uint8_t d = SensorUpdate();     /* 2. IR 传感器 + 误差 */
 
-        /* 减速阶段：1s 匀减速至 0 */
+        /* 立即停车 */
         if (decelerating) {
-            uint32_t elapsed = test_ms - decel_start_ms;
-            if (elapsed >= 1000) {
-                step_motor_stop(1);
-                step_motor_stop(2);
-                decelerating = 0;
-            } else {
-                float frac = 1.0f - (float)elapsed / 1000.0f;
-                float cur_speed = decel_start_spd * frac;
-                float cur_dps = (cur_speed * 360.0f) / (3.1415926f * 65.0f);
-                int16_t error = Err2();
-                float diff = cur_dps * TRACK_KP * (error / 7.0f);
-                step_motor_continuous_run(1, cur_dps + diff);
-                step_motor_continuous_run(2, cur_dps - diff);
-            }
-            OLED_UpdateStatus();            /* 仍刷新 OLED */
+            step_motor_stop(1);
+            step_motor_stop(2);
+            decelerating = 0;
             continue;
         }
 
@@ -181,7 +169,9 @@ int main(void)
         StepTrack_Run();                /* 6. 步进电机循迹 */
 
         VisionControl_Run();            /* 7. 视觉推杆控制 */
-    }
+
+        Task_Run();                     /* 8. 任务调度 */
+    } 
 }
 
 /* ================================================================

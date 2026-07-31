@@ -12,10 +12,13 @@
 #include "sys.h"
 #include <math.h>
 
-/* ---------- 内部状态 ---------- */
-static float ramp_speed;  /* 缓启动当前速度 */
+extern volatile uint32_t test_ms;  /* 1ms 计数器 (main.c) */
 
-#define RAMP_STEP   10.0f   /* 每次迭代增加 10 mm/s */
+/* ---------- 内部状态 ---------- */
+static float    ramp_speed;      /* 缓启动当前速度 */
+static uint32_t ramp_start_ms;   /* 缓启动起始时间 */
+
+#define RAMP_TIME_MS  2000U   /* 加速时间 2s */
 
 /* ---------- 辅助函数 ---------- */
 
@@ -51,14 +54,17 @@ void StepTrack_Run(void)
     if (!key.start) {
         step_motor_continuous_run(1, 0.0f);
         step_motor_continuous_run(2, 0.0f);
-        ramp_speed = 0.0f;
+        ramp_speed    = 0.0f;
+        ramp_start_ms = 0;
         return;
     }
 
-    /* 缓启动：逐步逼近目标速度 */
+    /* 缓启动：2s 内从 0 加速到 base_speed */
     if (ramp_speed < (float)base_speed) {
-        ramp_speed += RAMP_STEP;
-        if (ramp_speed > (float)base_speed) ramp_speed = (float)base_speed;
+        if (ramp_start_ms == 0) ramp_start_ms = test_ms;
+        float frac = (float)(test_ms - ramp_start_ms) / (float)RAMP_TIME_MS;
+        if (frac > 1.0f) frac = 1.0f;
+        ramp_speed = (float)base_speed * frac;
     }
 
     float base_dps = mmps_to_dps(ramp_speed);

@@ -19,10 +19,10 @@
  * ═══════════════════════════════════════════════════════════════ */
 
 /* 比例增益: 1cm误差 → P*1 deg/s 修正速度 */
-#define VC_P_GAIN              8.85f
+#define VC_P_GAIN              4.5f
 
 /* 微分增益: 阻尼抑制超调 */
-#define VC_D_GAIN             17.05f
+#define VC_D_GAIN             6.5f
 
 /* 速度-位置耦合: 球速动态修正目标, 防冲过头 (0=关闭, 负值才正确) */
 #define VC_VEL_COUPLE_GAIN     -0.20f
@@ -35,10 +35,10 @@
 #define VC_MAX_SPEED_DPS       150.0f
 
 /* 视觉距离 EMA 滤波系数 (0~1, 越小越平滑但延迟越大) */
-#define VC_EMA_ALPHA           0.6f
+#define VC_EMA_ALPHA           0.8f
 
 /* 钢珠速度 EMA 滤波系数 (应 < EMA_ALPHA) */
-#define VC_VEL_EMA_BETA       0.45f
+#define VC_VEL_EMA_BETA       0.75f
 
 /* ═══════════════════════════════════════════════════════════════
  *  控制参数
