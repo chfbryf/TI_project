@@ -19,8 +19,8 @@ static char oled_buf[16];
  * ================================================================ */
 static void OLED_UpdateStatus(void)
 {
-    /* 循迹时间：Task1/3/4模式下按键启动后计时，停车后保留 */
-    if (!time_prev_start && key.start && (key.task_id == 1 || key.task_id == 3 || key.task_id == 4)) {
+    /* 循迹时间：按键启动后计时，停车后保留 */
+    if (!time_prev_start && key.start && (key.task_id == 1 || key.task_id == 2 || key.task_id == 3 || key.task_id == 4)) {
         track_start_ms = test_ms;
         track_stopped   = 0;
     }
@@ -29,7 +29,7 @@ static void OLED_UpdateStatus(void)
     float sec;
     if (track_stopped) {
         sec = track_final_sec;
-    } else if (key.start && (key.task_id == 1 || key.task_id == 3 || key.task_id == 4)) {
+    } else if (key.start && (key.task_id == 1 || key.task_id == 2 || key.task_id == 3 || key.task_id == 4)) {
         sec = (test_ms - track_start_ms) / 1000.0f;
     } else {
         sec = 0.0f;
@@ -70,17 +70,17 @@ static uint8_t SensorUpdate(void)
 
 /* ================================================================
  * 十字停车检测
- * 停车标志：≥6路连续见黑 100ms → 停车
+ * 停车标志：100ms 窗口内累积 ≥5 路见黑 → 停车
  * ================================================================ */
-#define STOP_MIN_RUN_MS     18000  /* 最短运行时间 ms，防起步误判 */
-#define STOP_HOLD_MS        100   /* 连续满足条件 ms */
+#define STOP_MIN_RUN_MS     15000  /* 最短运行时间 ms，防起步误判 */
+#define STOP_WINDOW_MS      150   /* 观察窗口 ms */
 
 static uint8_t CheckStop(uint8_t d)
 {
-    static uint32_t stop_start_ms = 0;  /* 满足条件起始时间 */
+    static uint32_t window_start_ms = 0;
+    static uint8_t  accum = 0;           /* 窗口内累计见黑的路 */
 
     if (!key.start || (key.task_id != 1 && key.task_id != 3 && key.task_id != 4)) {
-        stop_start_ms = 0;
         return 0;
     }
 
@@ -91,14 +91,18 @@ static uint8_t CheckStop(uint8_t d)
         return 0;
     }
 
-    /* 全8路计数 ≥6 → 停车 */
-    uint8_t n = d;
-    n = (n & 0x55) + ((n >> 1) & 0x55);
-    n = (n & 0x33) + ((n >> 2) & 0x33);
-    n = (n & 0x0F) + (n >> 4);
-    if (n >= 6) {
-        if (stop_start_ms == 0) stop_start_ms = now;
-        if ((now - stop_start_ms) >= STOP_HOLD_MS) {
+    /* 位或累积：窗口内任何时刻见黑的路都存在 accum 里 */
+    accum |= d;
+    if (window_start_ms == 0) window_start_ms = now;
+
+    if ((now - window_start_ms) >= STOP_WINDOW_MS) {
+        /* 窗口结束，统计 accum 中见黑的路数 */
+        uint8_t n = accum;
+        n = (n & 0x55) + ((n >> 1) & 0x55);
+        n = (n & 0x33) + ((n >> 2) & 0x33);
+        n = (n & 0x0F) + (n >> 4);
+
+        if (n >= 4) {
             track_final_sec = (now - track_start_ms) / 1000.0f;
             track_stopped = 1;
             decelerating   = 1;
@@ -107,8 +111,9 @@ static uint8_t CheckStop(uint8_t d)
             key.start = 0;
             return 1;
         }
-    } else {
-        stop_start_ms = 0;  /* 不满足 → 重置计时 */
+        /* 不满足条件 → 清空窗口，重新观察 */
+        accum = 0;
+        window_start_ms = 0;
     }
 
     return 0;
@@ -170,8 +175,8 @@ int main(void)
 
         if (CheckStop(d)) continue;     /* 5. 十字停车 */
 
-        /* 6. 步进电机循迹（仅 Task 1/3/4 需要） */
-        if (key.task_id == 1 || key.task_id == 3 || key.task_id == 4) {
+        /* 6. 步进电机循迹 */
+        if (key.task_id == 1 || key.task_id == 2 || key.task_id == 3 || key.task_id == 4) {
             StepTrack_Run();
         }
 
