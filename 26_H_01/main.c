@@ -103,8 +103,8 @@ static uint8_t SensorUpdate(void)
  * 逻辑：300ms 滑动窗口内，累计 ≥3 路黑的时间 ≥50ms → 停车
  *      允许短暂掉线不重置，弯道不可能积累到 50ms
  * ================================================================ */
-#define STOP_WINDOW_MS      300    /* 滑动窗口 ms */
-#define STOP_BLACK_MIN      3      /* 最少黑线数 */
+#define STOP_WINDOW_MS      200    /* 滑动窗口 ms */
+#define STOP_BLACK_MIN      4      /* 最少黑线数 */
 #define STOP_ACCUM_MIN_MS   50     /* 窗口内最少累计黑线时间 ms */
 #define STOP_MIN_RUN_MS     18000  /* 最短运行时间 ms，防起步误判 */
 
