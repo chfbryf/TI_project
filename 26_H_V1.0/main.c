@@ -57,39 +57,9 @@ static void OLED_UpdateStatus(void)
  * ================================================================ */
 static uint8_t SensorUpdate(void)
 {
-    static uint32_t ir0_black_start_ms = 0;  /* ir[0] 消抖计时 */
-    static uint32_t ir7_black_start_ms = 0;  /* ir[7] 消抖计时 */
+    uint8_t ir[8];
 
-    uint8_t ir[8] = {1, 1, 1, 1, 1, 1, 1, 1};  /* 默认全白，防止首帧未到 */
     IR_Read(ir);
-
-    /* 最右边传感器单独消抖：连续 0.5s 见黑才有效 */
-    if (ir[7] == 0) {
-        if (ir7_black_start_ms == 0) ir7_black_start_ms = test_ms;
-        ir[7] = ((test_ms - ir7_black_start_ms) >= 500) ? 0 : 1;
-    } else {
-        ir7_black_start_ms = 0;
-        ir[7] = 1;
-    }
-
-    /* 最左边传感器同样消抖：连续 0.5s 见黑才有效 */
-    if (ir[0] == 0) {
-        if (ir0_black_start_ms == 0) ir0_black_start_ms = test_ms;
-        ir[0] = ((test_ms - ir0_black_start_ms) >= 500) ? 0 : 1;
-    } else {
-        ir0_black_start_ms = 0;
-        ir[0] = 1;
-    }
-
-    /* 最左边滤波：仅相邻 ir[1] 也为黑时 ir[0] 黑才有效 */
-    if (ir[0] == 0 && ir[1] != 0) {
-        ir[0] = 1;  /* 孤立黑 → 强制白 */
-    }
-
-    /* 最右边滤波：仅相邻 ir[6] 也为黑时 ir[7] 黑才有效 */
-    if (ir[7] == 0 && ir[6] != 0) {
-        ir[7] = 1;  /* 孤立黑 → 强制白 */
-    }
 
     Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
            | (ir[4]<<3) | (ir[5]<<2) | (ir[6]<<1) | (ir[7]<<0);
@@ -100,58 +70,35 @@ static uint8_t SensorUpdate(void)
 
 /* ================================================================
  * 十字停车检测
- * 停车标志：右边4路(ir[4]~ir[7])同时见黑 → 停车
- *       使用时间戳追踪，不依赖主循环帧率
+ * 停车标志：≥6路连续见黑 100ms → 停车
  * ================================================================ */
-#define STOP_WINDOW_MS      300    /* 滑动窗口 ms */
-#define STOP_ACCUM_MIN_MS   50     /* 窗口内最少累计黑线时间 ms */
 #define STOP_MIN_RUN_MS     18000  /* 最短运行时间 ms，防起步误判 */
+#define STOP_HOLD_MS        100   /* 连续满足条件 ms */
 
 static uint8_t CheckStop(uint8_t d)
 {
-    static uint32_t window_start  = 0;    /* 当前窗口起始时间 */
-    static uint32_t black_acc_ms  = 0;    /* 窗口内累计黑线时间 */
-    static uint32_t period_start  = 0;    /* 当前黑线段起始时间 */
-    static uint8_t  in_black      = 0;    /* 当前是否处于黑线状态 */
+    static uint32_t stop_start_ms = 0;  /* 满足条件起始时间 */
 
     if (!key.start || (key.task_id != 1 && key.task_id != 3 && key.task_id != 4)) {
-        window_start = 0;
-        black_acc_ms = 0;
-        period_start = 0;
-        in_black     = 0;
+        stop_start_ms = 0;
         return 0;
     }
 
     uint32_t now = test_ms;
 
-    if (window_start == 0) window_start = now;
-
-    /* 右边4路(ir[4]~ir[7], bit3~bit0)是否同时见黑 */
-    uint8_t stop_trigger = ((d & 0x0F) == 0);
-
-    /* ── 黑线状态机 ── */
-    if (stop_trigger) {
-        if (!in_black) {
-            in_black     = 1;
-            period_start = now;
-        }
-    } else {
-        if (in_black) {
-            black_acc_ms += now - period_start;
-            in_black      = 0;
-        }
+    /* 最短运行时间保护，防止起步误判 */
+    if ((now - track_start_ms) < STOP_MIN_RUN_MS) {
+        return 0;
     }
 
-    /* ── 窗口到期 → 结算 ── */
-    if (now - window_start >= STOP_WINDOW_MS) {
-        /* 仍在黑线中 → 结算当前段 */
-        if (in_black) {
-            black_acc_ms += now - period_start;
-            period_start  = now;
-        }
-
-        if (black_acc_ms >= STOP_ACCUM_MIN_MS
-            && (now - track_start_ms) >= STOP_MIN_RUN_MS) {
+    /* 全8路计数 ≥6 → 停车 */
+    uint8_t n = d;
+    n = (n & 0x55) + ((n >> 1) & 0x55);
+    n = (n & 0x33) + ((n >> 2) & 0x33);
+    n = (n & 0x0F) + (n >> 4);
+    if (n >= 6) {
+        if (stop_start_ms == 0) stop_start_ms = now;
+        if ((now - stop_start_ms) >= STOP_HOLD_MS) {
             track_final_sec = (now - track_start_ms) / 1000.0f;
             track_stopped = 1;
             decelerating   = 1;
@@ -160,9 +107,8 @@ static uint8_t CheckStop(uint8_t d)
             key.start = 0;
             return 1;
         }
-        /* 不满足 → 重置窗口 */
-        window_start = now;
-        black_acc_ms = 0;
+    } else {
+        stop_start_ms = 0;  /* 不满足 → 重置计时 */
     }
 
     return 0;
@@ -202,6 +148,11 @@ int main(void)
 
     while (1)
     {
+        /* 非阻塞 50ms 节流：与传感器 UART 帧率匹配 */
+        static uint32_t last_loop_ms = 0;
+        if (test_ms - last_loop_ms < 50) continue;
+        last_loop_ms = test_ms;
+
         key_work();                     /* 1. 按键扫描 */
 
         uint8_t d = SensorUpdate();     /* 2. IR 传感器 + 误差 */
