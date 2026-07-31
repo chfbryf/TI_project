@@ -75,8 +75,7 @@ void Task_Run(void)
             key.start = 0;
         }
         if (key.task_id == 2) {
-            t2_stage  = T2_STAGE_IDLE;
-            key.start = 0;
+            t2_stage = T2_STAGE_IDLE;
         }
         if (key.task_id == 3) {
             t3_stage  = T3_STAGE_IDLE;
@@ -127,7 +126,6 @@ void Task_Run(void)
                 t2_init       = 0;
                 t2_stable_cnt = 0;
                 t2_stage      = T2_STAGE_GOTO_7;
-                key.start     = 1;
             }
             break;
         }

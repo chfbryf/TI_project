@@ -18,7 +18,6 @@ extern uint32_t track_start_ms;          /* 行驶起始时间 (main.c) */
 /* ---------- 内部状态 ---------- */
 static float    ramp_speed;      /* 缓启动当前速度 */
 static uint32_t ramp_start_ms;   /* 缓启动起始时间 */
-static float    last_err_norm;   /* 上一帧归一化误差（D 项用） */
 
 #define RAMP_TIME_MS  2000U   /* 加速时间 2s */
 
@@ -58,7 +57,6 @@ void StepTrack_Run(void)
         step_motor_continuous_run(2, 0.0f);
         ramp_speed      = 0.0f;
         ramp_start_ms   = 0;
-        last_err_norm   = 0.0f;
         return;
     }
 
@@ -103,10 +101,8 @@ void StepTrack_Run(void)
     int16_t error = Err2();
     float err_norm = error / 7.0f;
 
-    /* PD 差速：P + D */
-    float d_err = err_norm - last_err_norm;
-    last_err_norm = err_norm;
-    float diff = base_dps * (TRACK_KP * err_norm + TRACK_KD * d_err);
+    /* P 差速 */
+    float diff = base_dps * TRACK_KP * err_norm;
 
     step_motor_continuous_run(1, base_dps + diff);
     step_motor_continuous_run(2, base_dps - diff);

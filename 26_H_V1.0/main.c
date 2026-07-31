@@ -19,8 +19,8 @@ static char oled_buf[16];
  * ================================================================ */
 static void OLED_UpdateStatus(void)
 {
-    /* 循迹时间：按键启动后计时，停车后保留 */
-    if (!time_prev_start && key.start && (key.task_id == 1 || key.task_id == 2 || key.task_id == 3 || key.task_id == 4)) {
+    /* 循迹时间：Task1/3/4模式下按键启动后计时，停车后保留 */
+    if (!time_prev_start && key.start && (key.task_id == 1 || key.task_id == 3 || key.task_id == 4)) {
         track_start_ms = test_ms;
         track_stopped   = 0;
     }
@@ -29,7 +29,7 @@ static void OLED_UpdateStatus(void)
     float sec;
     if (track_stopped) {
         sec = track_final_sec;
-    } else if (key.start && (key.task_id == 1 || key.task_id == 2 || key.task_id == 3 || key.task_id == 4)) {
+    } else if (key.start && (key.task_id == 1 || key.task_id == 3 || key.task_id == 4)) {
         sec = (test_ms - track_start_ms) / 1000.0f;
     } else {
         sec = 0.0f;
@@ -175,8 +175,8 @@ int main(void)
 
         if (CheckStop(d)) continue;     /* 5. 十字停车 */
 
-        /* 6. 步进电机循迹 */
-        if (key.task_id == 1 || key.task_id == 2 || key.task_id == 3 || key.task_id == 4) {
+        /* 6. 步进电机循迹（仅 Task 1/3/4 需要） */
+        if (key.task_id == 1 || key.task_id == 3 || key.task_id == 4) {
             StepTrack_Run();
         }
 

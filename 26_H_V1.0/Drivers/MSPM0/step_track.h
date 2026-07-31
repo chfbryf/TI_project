@@ -19,13 +19,12 @@
 #define TRACK_SPEED_T1           160    /* 任务1 基础速度 mm/s */
 #define TRACK_SPEED_T2_EARLY     200    /* 任务2 前期速度 mm/s (15s前) */
 #define TRACK_SPEED_T2_LATE       90    /* 任务2 后期速度 mm/s (15s后) */
-#define TRACK_SPEED_T34           50    /* 任务3/4 基础速度 mm/s */
+#define TRACK_SPEED_T34          110    /* 任务3/4 基础速度 mm/s */
 #define TRACK_T2_SWITCH_MS     15000U   /* 任务2 变速时间点 ms */
 #define TRACK_T2_DECEL_MS       1000U   /* 任务2 减速过渡时间 ms */
 
 /* ---------- 循迹增益 ---------- */
 #define TRACK_KP            0.28f    /* P 增益 */
-#define TRACK_KD            0.00f     /* D 增益 */
 
 void StepTrack_Init(void);
 void StepTrack_Stop(void);
