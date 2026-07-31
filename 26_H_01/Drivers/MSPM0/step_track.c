@@ -17,6 +17,8 @@ extern volatile uint32_t test_ms;  /* 1ms 计数器 (main.c) */
 /* ---------- 内部状态 ---------- */
 static float    ramp_speed;      /* 缓启动当前速度 */
 static uint32_t ramp_start_ms;   /* 缓启动起始时间 */
+static float    prev_err_norm;   /* 上一帧归一化误差（用于 D 项） */
+static uint8_t  d_inited;        /* D 项首次初始化标志 */
 
 #define RAMP_TIME_MS  2000U   /* 加速时间 2s */
 
@@ -40,6 +42,7 @@ void StepTrack_Stop(void)
 {
     step_motor_stop(1);
     step_motor_stop(2);
+    d_inited = 0;  /* 下次启动重新初始化 D 项 */
 }
 
 /**
@@ -72,7 +75,16 @@ void StepTrack_Run(void)
     int16_t error = Err2();
     float err_norm = error / 7.0f;
 
-    float diff = base_dps * TRACK_KP * err_norm;
+    /* D 项：误差变化率，阻尼摆动 */
+    float d_term = 0.0f;
+    if (d_inited) {
+        d_term = TRACK_KD * (err_norm - prev_err_norm);
+    } else {
+        d_inited = 1;
+    }
+    prev_err_norm = err_norm;
+
+    float diff = base_dps * (TRACK_KP * err_norm + d_term);
 
     step_motor_continuous_run(1, base_dps + diff);
     step_motor_continuous_run(2, base_dps - diff);

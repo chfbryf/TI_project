@@ -57,31 +57,38 @@ static void OLED_UpdateStatus(void)
  * ================================================================ */
 static uint8_t SensorUpdate(void)
 {
-    static uint8_t ir0_db_cnt = 0;
-    static uint8_t ir7_db_cnt = 0;
+    static uint32_t ir0_black_start_ms = 0;  /* ir[0] 消抖计时 */
+    static uint32_t ir7_black_start_ms = 0;  /* ir[7] 消抖计时 */
 
     uint8_t ir[8] = {1, 1, 1, 1, 1, 1, 1, 1};  /* 默认全白，防止首帧未到 */
     IR_Read(ir);
 
-    /* 最右边传感器单独消抖：连续3帧见黑才有效 */
+    /* 最右边传感器单独消抖：连续 0.5s 见黑才有效 */
     if (ir[7] == 0) {
-        if (ir7_db_cnt < 3) ir7_db_cnt++;
+        if (ir7_black_start_ms == 0) ir7_black_start_ms = test_ms;
+        ir[7] = ((test_ms - ir7_black_start_ms) >= 500) ? 0 : 1;
     } else {
-        ir7_db_cnt = 0;
+        ir7_black_start_ms = 0;
+        ir[7] = 1;
     }
-    ir[7] = (ir7_db_cnt >= 3) ? 0 : 1;
 
-    /* 最左边传感器同样消抖：连续3帧见黑才有效 */
+    /* 最左边传感器同样消抖：连续 0.5s 见黑才有效 */
     if (ir[0] == 0) {
-        if (ir0_db_cnt < 3) ir0_db_cnt++;
+        if (ir0_black_start_ms == 0) ir0_black_start_ms = test_ms;
+        ir[0] = ((test_ms - ir0_black_start_ms) >= 500) ? 0 : 1;
     } else {
-        ir0_db_cnt = 0;
+        ir0_black_start_ms = 0;
+        ir[0] = 1;
     }
-    ir[0] = (ir0_db_cnt >= 3) ? 0 : 1;
 
     /* 最左边滤波：仅相邻 ir[1] 也为黑时 ir[0] 黑才有效 */
     if (ir[0] == 0 && ir[1] != 0) {
         ir[0] = 1;  /* 孤立黑 → 强制白 */
+    }
+
+    /* 最右边滤波：仅相邻 ir[6] 也为黑时 ir[7] 黑才有效 */
+    if (ir[7] == 0 && ir[6] != 0) {
+        ir[7] = 1;  /* 孤立黑 → 强制白 */
     }
 
     Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
