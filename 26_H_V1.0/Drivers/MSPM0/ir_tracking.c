@@ -36,10 +36,12 @@ void IR_Init(void)
 
 void IR_Read(uint8_t data[8])
 {
+    NVIC_DisableIRQ(UART1_SENSOR_INST_INT_IRQN);
     if (ir_data_ready) {
         memcpy(data, ir_data, 8);
         ir_data_ready = 0;
     }
+    NVIC_EnableIRQ(UART1_SENSOR_INST_INT_IRQN);
 }
 
 /**
@@ -85,6 +87,8 @@ void UART1_SENSOR_INST_IRQHandler(void)
         } else {
             if (ir_idx < sizeof(ir_buf)) {
                 ir_buf[ir_idx++] = ch;
+            } else {
+                ir_state = IR_WAIT_START;  /* 溢出: 丢包重同步 */
             }
         }
         break;

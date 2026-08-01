@@ -226,7 +226,7 @@ void Task_Run(void)
             }
             break;
 
-        /* ── 阶段2: 已停车，时间保留在OLED上 ── */
+        /* ── 阶段3: 已停车，时间保留在OLED上 ── */
         case T4_STAGE_STOPPED:
         default:
             break;

@@ -136,14 +136,17 @@ void VisionControl_Run(void)
     if (key.start && (key.task_id == 1 || key.task_id == 3 || key.task_id == 4)) {
         float car_accel_mmps2 = (ramp_now - prev_ramp_speed) / dt;   /* mm/s² */
         float car_accel_cmps2 = car_accel_mmps2 * 0.1f;              /* → cm/s² */
-        ff_out = VC_CAR_ACCEL_FF_GAIN * car_accel_cmps2;             /* → deg/s */
+        ff_out = (key.task_id == 2 ? VC_CAR_ACCEL_FF_GAIN_T2 : VC_CAR_ACCEL_FF_GAIN)
+               * car_accel_cmps2;                              /* → deg/s */
         prev_ramp_speed = ramp_now;
     } else {
         prev_ramp_speed = 0.0f;    /* 非小车运动场景，清零防残留 */
     }
 
     /* 速度耦合: 球速修正目标位置, 提前预判刹车 */
-    float coupled_target = target_cm + VC_VEL_COUPLE_GAIN * ema_ball_vel;
+    float coupled_target = target_cm
+                          + (key.task_id == 2 ? VC_VEL_COUPLE_GAIN_T2 : VC_VEL_COUPLE_GAIN)
+                          * ema_ball_vel;
     float error = coupled_target - ema_distance_cm;
 
     /* 死区（无前馈时才完全停机） */
@@ -161,7 +164,9 @@ void VisionControl_Run(void)
     }
     last_error_cm = error;
 
-    float output = VC_P_GAIN * error + VC_D_GAIN * derivative + ff_out;
+    float output = (key.task_id == 2 ? VC_P_GAIN_T2 : VC_P_GAIN) * error
+                 + (key.task_id == 2 ? VC_D_GAIN_T2 : VC_D_GAIN) * derivative
+                 + ff_out;
 
     /* 限幅 */
     if (output >  VC_MAX_SPEED_DPS) output =  VC_MAX_SPEED_DPS;

@@ -19,17 +19,27 @@
  *  PD + 速度耦合 参数
  * ═══════════════════════════════════════════════════════════════ */
 
+/* ── 任务1/3/4 参数 ── */
 /* 比例增益: 1cm误差 → P*1 deg/s 修正速度 */
-#define VC_P_GAIN              4.688f
+#define VC_P_GAIN              6.542f
 
 /* 微分增益: 阻尼抑制超调 */
-#define VC_D_GAIN             2.585f
+#define VC_D_GAIN             5.47f
 
 /* 速度-位置耦合: 球速动态修正目标, 防冲过头 (0=关闭, 负值才正确) */
-#define VC_VEL_COUPLE_GAIN     -0.3205f
+#define VC_VEL_COUPLE_GAIN     -1.55f
 
 /* 小车加速度前馈: 小车起步时预判钢珠惯性后滚, 提前推杆 (0=关闭) */
-#define VC_CAR_ACCEL_FF_GAIN   0.05f
+#define VC_CAR_ACCEL_FF_GAIN   -0.125f
+
+/* ── 任务2 参数（小车不运动，纯推杆控制）── */
+#define VC_P_GAIN_T2            5.111f
+
+#define VC_D_GAIN_T2            5.71f
+
+#define VC_VEL_COUPLE_GAIN_T2  -0.365f
+
+#define VC_CAR_ACCEL_FF_GAIN_T2  0.0f    /* 任务2 小车不运动，无前馈 */
 
 /* ═══════════════════════════════════════════════════════════════
  *  滤波 & 控制参数 
@@ -41,7 +51,7 @@
 /* 视觉距离 EMA 滤波系数 (0~1, 越小越平滑但延迟越大) */
 #define VC_EMA_ALPHA           0.6f
 
-/* 钢珠速度 EMA 滤波系数 (应 < EMA_ALPHA) */
+/* 钢珠速度 EMA 滤波系数 (0~1) */
 #define VC_VEL_EMA_BETA       0.75f
 
 /* ═══════════════════════════════════════════════════════════════

@@ -39,9 +39,10 @@ extern volatile uint32_t delay_flag;
 extern volatile unsigned char Digtal;
 
 /* 循迹任务计时变量（main.c 定义，task.c 使用） */
-extern uint32_t track_start_ms;
+extern volatile uint32_t track_start_ms;
 extern uint8_t  track_stopped;
 extern float    track_final_sec;
+extern uint8_t  decelerating;       /* 减速中标志 */
 
 void speed(void);
 

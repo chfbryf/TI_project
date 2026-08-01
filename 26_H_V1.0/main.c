@@ -5,12 +5,11 @@
  * 全局变量
  * ================================================================ */
 static uint8_t  time_prev_start = 0;  /* key.start 上升沿检测 */
-uint32_t track_start_ms  = 0;          /* 行驶起始时间 */
+volatile uint32_t track_start_ms  = 0;  /* 行驶起始时间 */
 uint8_t  track_stopped   = 0;          /* 停车标志 */
 float    track_final_sec = 0;          /* 停车时刻保留的时间 */
-static uint8_t  decelerating    = 0;   /* 减速中标志 */
-static uint32_t decel_start_ms  = 0;   /* 减速起始时间 */
-volatile uint32_t test_ms = 0;       /* 1ms 计数器 */
+uint8_t  decelerating    = 0;          /* 减速中标志 */
+volatile uint32_t test_ms = 0;         /* 1ms 计数器 */
 static char oled_buf[16];
 
 /* ================================================================
@@ -60,8 +59,10 @@ static uint8_t SensorUpdate(void)
 
     IR_Read(ir);
 
+    /* 左1传感器已坏，强制白避免干扰循迹和停车检测 */
+    ir[0] = 1;
+
     /* 最外侧传感器邻域门控: 黑线必有宽度，单路孤立即为噪声 */
-    if (ir[0] == 0 && ir[1] != 0) ir[0] = 1;   /* 左1孤黑 → 滤除 */
     if (ir[7] == 0 && ir[6] != 0) ir[7] = 1;   /* 右1孤黑 → 滤除 */
 
     Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
@@ -73,52 +74,64 @@ static uint8_t SensorUpdate(void)
 
 /* ================================================================
  * 十字停车检测
- * 停车标志：100ms 窗口内累积 ≥4 路见黑 → 停车
+ * 100ms内最右边5路（ir[3]~ir[7]）累积 ≥5路亮起 → 触发停车
  * ================================================================ */
-#define STOP_MIN_RUN_MS     15000  /* 最短运行时间 ms，防起步误判 */
-#define STOP_WINDOW_MS      50   /* 观察窗口 ms */
+#define STOP_MIN_RUN_T1_MS  15000  /* 任务1 最短运行时间 ms */
+#define STOP_MIN_RUN_T3_MS  20000  /* 任务3 最短运行时间 ms（20s内不可停车） */
+#define STOP_ACCUM_WINDOW_MS  120  /* 累积窗口 ms */
 
-static uint8_t CheckStop(uint8_t d)
+static void CheckStop(uint8_t d)
 {
-    static uint32_t window_start_ms = 0;
-    static uint8_t  accum = 0;           /* 窗口内累计见黑的路 */
+    static uint32_t acc_start_ms = 0;    /* 累积起始时刻 */
+    static uint8_t  acc_bits     = 0;    /* 累积的黑位 */
 
     if (!key.start || (key.task_id != 1 && key.task_id != 3 && key.task_id != 4)) {
-        return 0;
+        acc_start_ms = 0;
+        acc_bits     = 0;
+        return;
     }
+
+    if (decelerating) return;           /* 已在减速，不重复触发 */
 
     uint32_t now = test_ms;
 
-    /* 最短运行时间保护，防止起步误判 */
-    if ((now - track_start_ms) < STOP_MIN_RUN_MS) {
-        return 0;
+    /* 最短运行时间保护（按任务区分） */
+    {
+        uint32_t min_run = (key.task_id == 3) ? STOP_MIN_RUN_T3_MS : STOP_MIN_RUN_T1_MS;
+        if ((now - track_start_ms) < min_run) {
+            acc_start_ms = 0;
+            acc_bits     = 0;
+            return;
+        }
     }
 
-    /* 位或累积：窗口内任何时刻见黑的路都存在 accum 里 (bit=0黑) */
-    accum |= (uint8_t)~d;
-    if (window_start_ms == 0) window_start_ms = now;
+    /* 最右边5路黑位: ir[3]~ir[7] 对应 ~d 的 bit4~bit0, 1=黑 */
+    uint8_t right_bits = ((uint8_t)~d) & 0x1F;
 
-    if ((now - window_start_ms) >= STOP_WINDOW_MS) {
-        /* 窗口结束，统计 accum 中见黑的路数 */
-        uint8_t n = accum;
+    /* 100ms 超时重置 */
+    if (acc_start_ms != 0 && (now - acc_start_ms) > STOP_ACCUM_WINDOW_MS) {
+        acc_start_ms = 0;
+        acc_bits     = 0;
+    }
+
+    if (right_bits != 0) {
+        if (acc_start_ms == 0) acc_start_ms = now;
+        acc_bits |= right_bits;
+
+        /* 统计累积黑路数 */
+        uint8_t n = acc_bits;
         n = (n & 0x55) + ((n >> 1) & 0x55);
         n = (n & 0x33) + ((n >> 2) & 0x33);
         n = (n & 0x0F) + (n >> 4);
 
-        if (n >= 4) {
+        if (n >= 5) {
             track_final_sec = (now - track_start_ms) / 1000.0f;
             track_stopped = 1;
-            decelerating   = 1;
-            decel_start_ms = now;
-            key.start = 0;
-            return 1;
+            decelerating   = 1;         /* 触发减速，key.start 保持 1 */
+            acc_start_ms = 0;
+            acc_bits     = 0;
         }
-        /* 不满足条件 → 清空窗口，重新观察 */
-        accum = 0;
-        window_start_ms = 0;
     }
-
-    return 0;
 }
 
 /* ================================================================
@@ -164,30 +177,21 @@ int main(void)
 
         uint8_t d = SensorUpdate();     /* 2. IR 传感器 + 误差 */
 
-        /* 立即停车 */
-        if (decelerating) {
-            step_motor_stop(1);
-            step_motor_stop(2);
-            step_motor_stop(3);
-            decelerating = 0;
-            continue;
-        }
+        CheckStop(d);                   /* 3. 十字停车检测 */
 
         OLED_UpdateStatus();            /* 4. OLED: 时间 / Digtal / Spd / Lap */
 
-        if (CheckStop(d)) continue;     /* 5. 十字停车 */
-
-        /* 6. 步进电机循迹（仅 Task 1/3/4 需要） */
+        /* 5. 步进电机循迹（仅 Task 1/3/4 需要，减速由 StepTrack_Run 内部处理） */
         if (key.task_id == 1 || key.task_id == 3 || key.task_id == 4) {
             StepTrack_Run();
         }
 
-        /* 7. 视觉推杆控制（仅激活中的 Task 2/3/4） */
+        /* 6. 视觉推杆控制（仅激活中的 Task 2/3/4） */
         if (Task_IsVisionActive()) {
             VisionControl_Run();
         }
 
-        Task_Run();                     /* 8. 任务调度 */
+        Task_Run();                     /* 7. 任务调度 */
     } 
 }
 

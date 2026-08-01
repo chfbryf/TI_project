@@ -32,7 +32,7 @@ void Get_err2(void)
      * bit3 → +1, bit2 → +3, bit1 → +5, bit0(右) → +7
      * bit=0 表示见到黑线，对权重求和取平均 */
     {
-        static const int8_t weight[8] = {5, 5, 3, 1, -1, -3, -5, -0};
+        static const int8_t weight[8] = {7, 5, 3, 1, -1, -3, -5, -0};
         int16_t sum = 0;
         int8_t  cnt = 0;
 
@@ -43,7 +43,7 @@ void Get_err2(void)
             }
         }
 
-        err2 = (cnt > 0) ? (sum / cnt) : 0;
+        err2 = (cnt > 0) ? (int16_t)((float)sum / (float)cnt) : 0;
     }
 
     if (err2 != 0) last_valid_err2 = err2;  /* 保存方向供丢线时使用 */
