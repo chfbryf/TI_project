@@ -18,6 +18,8 @@ extern uint32_t track_start_ms;          /* 行驶起始时间 (main.c) */
 /* ---------- 内部状态 ---------- */
 static float    ramp_speed;      /* 缓启动当前速度 */
 static uint32_t ramp_start_ms;   /* 缓启动起始时间 */
+static float    prev_left;       /* 上一帧左轮速度，用于限幅 */
+static float    prev_right;      /* 上一帧右轮速度，用于限幅 */
 
 #define RAMP_TIME_MS  2000U   /* 加速时间 2s */
 
@@ -66,6 +68,8 @@ void StepTrack_Run(void)
         step_motor_continuous_run(2, 0.0f);
         ramp_speed      = 0.0f;
         ramp_start_ms   = 0;
+        prev_left       = 0.0f;
+        prev_right      = 0.0f;
         return;
     }
 
@@ -107,12 +111,27 @@ void StepTrack_Run(void)
 
     float base_dps = mmps_to_dps(ramp_speed);
 
-    int16_t error = Err2();
-    float err_norm = error / 7.0f;
+    /* EMA滤波 + PD控制：EMA平滑传感器抖动，D抑制误差突变防摆动 */
+    static float prev_error = 0.0f;
+    int16_t error_raw = Err2();
+    float error_ema = TRACK_ERROR_EMA_ALPHA * (float)error_raw
+                    + (1.0f - TRACK_ERROR_EMA_ALPHA) * prev_error;
+    float derivative = (error_ema - prev_error) / 0.05f;  /* dt≈50ms */
+    prev_error = error_ema;
 
-    /* P 差速 */
-    float diff = base_dps * TRACK_KP * err_norm;
+    float diff = base_dps * (TRACK_KP * (error_ema / 7.0f)
+                           + TRACK_KD * (derivative / 7.0f));
 
-    step_motor_continuous_run(1, base_dps + diff);
-    step_motor_continuous_run(2, base_dps - diff);
+    /* 速度限幅: 防止PD突变导致电机急加速/急减速 */
+    float left  = base_dps + diff;
+    float right = base_dps - diff;
+    if (left  > prev_left  + TRACK_MAX_DPS_DELTA) left  = prev_left  + TRACK_MAX_DPS_DELTA;
+    if (left  < prev_left  - TRACK_MAX_DPS_DELTA) left  = prev_left  - TRACK_MAX_DPS_DELTA;
+    if (right > prev_right + TRACK_MAX_DPS_DELTA) right = prev_right + TRACK_MAX_DPS_DELTA;
+    if (right < prev_right - TRACK_MAX_DPS_DELTA) right = prev_right - TRACK_MAX_DPS_DELTA;
+    prev_left  = left;
+    prev_right = right;
+
+    step_motor_continuous_run(1, left);
+    step_motor_continuous_run(2, right);
 }
