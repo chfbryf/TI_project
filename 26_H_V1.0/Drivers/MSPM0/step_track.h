@@ -24,9 +24,9 @@
 #define TRACK_T2_DECEL_MS       1000U   /* 任务2 减速过渡时间 ms */
 
 /* ---------- 循迹增益 ---------- */
-#define TRACK_KP            0.286038f    /* P 增益 */
-#define TRACK_KD            0.08f        /* D 增益: 阻尼抑制摆动 (0=纯P) */
-#define TRACK_ERROR_EMA_ALPHA   0.4f     /* 误差EMA滤波: 越小越平滑 */
+#define TRACK_KP            0.316038f    /* P 增益 */
+#define TRACK_KD            0.0f        /* D 增益: 阻尼抑制摆动 (0=纯P) */
+#define TRACK_ERROR_EMA_ALPHA   0.8f     /* 误差EMA滤波: 越小越平滑 */
 #define TRACK_MAX_DPS_DELTA   30.0f      /* 每帧最大速度变化 (deg/s/50ms) */
 
 void StepTrack_Init(void);

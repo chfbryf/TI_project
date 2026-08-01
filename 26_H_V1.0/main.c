@@ -10,7 +10,6 @@ uint8_t  track_stopped   = 0;          /* 停车标志 */
 float    track_final_sec = 0;          /* 停车时刻保留的时间 */
 static uint8_t  decelerating    = 0;   /* 减速中标志 */
 static uint32_t decel_start_ms  = 0;   /* 减速起始时间 */
-static float    decel_start_spd = 0;   /* 减速起始速度 */
 volatile uint32_t test_ms = 0;       /* 1ms 计数器 */
 static char oled_buf[16];
 
@@ -57,9 +56,13 @@ static void OLED_UpdateStatus(void)
  * ================================================================ */
 static uint8_t SensorUpdate(void)
 {
-    uint8_t ir[8];
+    uint8_t ir[8] = {1, 1, 1, 1, 1, 1, 1, 1};  /* 默认全白，防首帧未到 */
 
     IR_Read(ir);
+
+    /* 最外侧传感器邻域门控: 黑线必有宽度，单路孤立即为噪声 */
+    if (ir[0] == 0 && ir[1] != 0) ir[0] = 1;   /* 左1孤黑 → 滤除 */
+    if (ir[7] == 0 && ir[6] != 0) ir[7] = 1;   /* 右1孤黑 → 滤除 */
 
     Digtal = (ir[0]<<7) | (ir[1]<<6) | (ir[2]<<5) | (ir[3]<<4)
            | (ir[4]<<3) | (ir[5]<<2) | (ir[6]<<1) | (ir[7]<<0);
@@ -70,10 +73,10 @@ static uint8_t SensorUpdate(void)
 
 /* ================================================================
  * 十字停车检测
- * 停车标志：100ms 窗口内累积 ≥5 路见黑 → 停车
+ * 停车标志：100ms 窗口内累积 ≥4 路见黑 → 停车
  * ================================================================ */
 #define STOP_MIN_RUN_MS     15000  /* 最短运行时间 ms，防起步误判 */
-#define STOP_WINDOW_MS      150   /* 观察窗口 ms */
+#define STOP_WINDOW_MS      50   /* 观察窗口 ms */
 
 static uint8_t CheckStop(uint8_t d)
 {
@@ -91,8 +94,8 @@ static uint8_t CheckStop(uint8_t d)
         return 0;
     }
 
-    /* 位或累积：窗口内任何时刻见黑的路都存在 accum 里 */
-    accum |= d;
+    /* 位或累积：窗口内任何时刻见黑的路都存在 accum 里 (bit=0黑) */
+    accum |= (uint8_t)~d;
     if (window_start_ms == 0) window_start_ms = now;
 
     if ((now - window_start_ms) >= STOP_WINDOW_MS) {
@@ -107,7 +110,6 @@ static uint8_t CheckStop(uint8_t d)
             track_stopped = 1;
             decelerating   = 1;
             decel_start_ms = now;
-            decel_start_spd = (float)base_speed;
             key.start = 0;
             return 1;
         }

@@ -79,15 +79,15 @@ void StepTrack_Run(void)
     if (key.task_id == 2) {
         uint32_t elapsed = test_ms - track_start_ms;
         if (elapsed < TRACK_T2_SWITCH_MS) {
-            target_speed = TRACK_SPEED_T2_EARLY;        /* 180 mm/s */
+            target_speed = TRACK_SPEED_T2_EARLY;        /* 200 mm/s */
         } else if (elapsed < TRACK_T2_SWITCH_MS + TRACK_T2_DECEL_MS) {
-            /* 15s~15.5s: 线性从 180 降到 120 */
+            /* 15s~16s: 线性从 200 降到 90 */
             float frac = (float)(elapsed - TRACK_T2_SWITCH_MS) / (float)TRACK_T2_DECEL_MS;
             target_speed = (int16_t)(TRACK_SPEED_T2_EARLY
                            + frac * (TRACK_SPEED_T2_LATE - TRACK_SPEED_T2_EARLY));
             t2_decel = 1;
         } else {
-            target_speed = TRACK_SPEED_T2_LATE;          /* 120 mm/s */
+            target_speed = TRACK_SPEED_T2_LATE;          /* 90 mm/s */
         }
     } else {
         target_speed = (key.task_id == 1) ? TRACK_SPEED_T1 : TRACK_SPEED_T34;
@@ -96,7 +96,7 @@ void StepTrack_Run(void)
     /* 缓启动/缓变速 */
     if (ramp_speed != (float)target_speed) {
         if (t2_decel) {
-            /* Task 2 减速阶段：直接跟随目标，0.5s 内平滑过渡 */
+            /* Task 2 减速阶段：瞬时切换目标速度 */
             ramp_speed = (float)target_speed;
         } else {
             if (ramp_start_ms == 0) ramp_start_ms = test_ms;
@@ -122,7 +122,7 @@ void StepTrack_Run(void)
     float diff = base_dps * (TRACK_KP * (error_ema / 7.0f)
                            + TRACK_KD * (derivative / 7.0f));
 
-    /* 速度限幅: 防止PD突变导致电机急加速/急减速 */
+    /* 速度限幅: 防止电机急加速/急减速 */
     float left  = base_dps + diff;
     float right = base_dps - diff;
     if (left  > prev_left  + TRACK_MAX_DPS_DELTA) left  = prev_left  + TRACK_MAX_DPS_DELTA;

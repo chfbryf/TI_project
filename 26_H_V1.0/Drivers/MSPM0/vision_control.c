@@ -25,6 +25,7 @@ static float   target_cm         = VC_DEFAULT_TARGET_CM;
 static float   last_error_cm     = 0.0f;
 static float   prev_ramp_speed   = 0.0f;   /* 上一帧小车速度，用于算加速度 */
 static uint32_t last_control_ms   = 0;
+static bool     skip_derivative    = false;  /* SetTarget后首帧抑制D尖峰 */
 
 /* 前馈相关 */
 static float   ema_distance_cm   = 0.0f;   /* EMA滤波后的距离 */
@@ -46,6 +47,7 @@ void VisionControl_Init(void)
     last_error_cm     = 0.0f;
     prev_ramp_speed   = 0.0f;
     last_control_ms   = 0;
+    skip_derivative   = false;
     ema_distance_cm   = 0.0f;
     prev_ema_distance = 0.0f;
     ema_ball_vel      = 0.0f;
@@ -81,12 +83,17 @@ void VisionControl_Run(void)
     }
 
     /* ── 3. 控制间隔 ── */
-    if ((test_ms - last_control_ms) < VC_CONTROL_INTERVAL_MS) return;
-    last_control_ms = test_ms;
+    uint32_t now = test_ms;
+    if (last_control_ms != 0 && (now - last_control_ms) < VC_CONTROL_INTERVAL_MS) return;
 
     /* ── 4. 等待新帧 ── */
     if (!vision.data_ready) return;
     vision.data_ready = false;
+
+    /* 实际 dt：用两次控制的真实间隔，首帧默认 30ms */
+    float dt = (last_control_ms != 0) ? (float)(now - last_control_ms) / 1000.0f
+                                      : VC_CONTROL_INTERVAL_MS / 1000.0f;
+    last_control_ms = now;
 
     /* ── 5. 自动标定：前N帧平均距离作为目标 ── */
     if (!calib_done) {
@@ -100,7 +107,6 @@ void VisionControl_Run(void)
     }
 
     /* ── 6. EMA 滤波距离 + 估算钢珠速度 ── */
-    float dt = VC_CONTROL_INTERVAL_MS / 1000.0f;
 
     if (!ema_initialized) {
         /* 首次直接赋值，不做滤波 */
@@ -122,7 +128,7 @@ void VisionControl_Run(void)
                      + (1.0f - VC_VEL_EMA_BETA) * ema_ball_vel;
     }
 
-    /* ── 7. PID + 速度耦合 + 小车加速度前馈 ── */
+    /* ── 7. PD + 速度耦合 + 小车加速度前馈 ── */
 
     /* 小车加速度前馈: 仅 Task 1/3/4 小车运动时有效 */
     float ramp_now = StepTrack_GetRampSpeed();
@@ -149,6 +155,10 @@ void VisionControl_Run(void)
 
     /* PD计算 */
     float derivative = (error - last_error_cm) / dt;
+    if (skip_derivative) {
+        derivative = 0.0f;           /* SetTarget后首帧抑制D尖峰 */
+        skip_derivative = false;
+    }
     last_error_cm = error;
 
     float output = VC_P_GAIN * error + VC_D_GAIN * derivative + ff_out;
@@ -169,8 +179,9 @@ void VisionControl_SetTarget(float cm)
 {
     target_cm = cm;
     if (target_cm < 0.0f) target_cm = 0.0f;
-    last_error_cm   = 0.0f;
-    last_control_ms = 0;
+    last_error_cm    = 0.0f;
+    last_control_ms  = 0;
+    skip_derivative  = true;   /* 首帧抑制D尖峰 */
 }
 
 float VisionControl_GetError(void)
