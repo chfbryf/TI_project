@@ -44,6 +44,15 @@ void StepTrack_Stop(void)
 }
 
 /**
+ * @brief 获取小车当前缓启速度，供 vision_control 前馈补偿
+ * @return 速度 mm/s，未启动时返回 0
+ */
+float StepTrack_GetRampSpeed(void)
+{
+    return ramp_speed;
+}
+
+/**
  * @brief 循迹控制：IR 误差 → 步进电机差速直驱
  *
  * 每轮主循环调用一次。根据按键启停状态：

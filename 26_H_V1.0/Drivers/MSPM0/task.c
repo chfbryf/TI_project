@@ -151,7 +151,7 @@ void Task_Run(void)
         /* ── 阶段2: 再到 16cm ── */
         case T2_STAGE_GOTO_16:
             if (!t2_init) {
-                VisionControl_SetTarget(16.0f);
+                VisionControl_SetTarget(17.0f);
                 t2_init = 1;
             }
             if (VisionControl_IsStable()) {

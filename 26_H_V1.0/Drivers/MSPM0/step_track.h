@@ -24,10 +24,11 @@
 #define TRACK_T2_DECEL_MS       1000U   /* 任务2 减速过渡时间 ms */
 
 /* ---------- 循迹增益 ---------- */
-#define TRACK_KP            0.28f    /* P 增益 */
+#define TRACK_KP            0.286038f    /* P 增益 *///
 
 void StepTrack_Init(void);
 void StepTrack_Stop(void);
 void StepTrack_Run(void);
+float StepTrack_GetRampSpeed(void);   /* 获取小车当前缓启速度 mm/s，供前馈补偿 */
 
 #endif /* STEP_TRACK_H */

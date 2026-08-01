@@ -1,10 +1,11 @@
 /**
  * @file    vision_control.h
- * @brief   视觉坐标 → 电机3 PD + 速度耦合控制
+ * @brief   视觉坐标 → 电机3 PD + 速度耦合 + 小车加速度前馈
  *
  * 公式: error = coupled_target - distance
  *       coupled_target = target + k_couple * ball_vel
- *       output = P*error + D*derror/dt
+ *       ff = k_ff * car_accel  (小车起步时预判钢珠后滚)
+ *       output = P*error + D*derror/dt + ff
  *
  * 机械参数: 电机转 160° → 推杆动 52mm → 杆子摆动
  */
@@ -19,16 +20,19 @@
  * ═══════════════════════════════════════════════════════════════ */
 
 /* 比例增益: 1cm误差 → P*1 deg/s 修正速度 */
-#define VC_P_GAIN              9.13f
+#define VC_P_GAIN              4.688f
 
 /* 微分增益: 阻尼抑制超调 */
-#define VC_D_GAIN             8.972f
+#define VC_D_GAIN             2.585f
 
 /* 速度-位置耦合: 球速动态修正目标, 防冲过头 (0=关闭, 负值才正确) */
-#define VC_VEL_COUPLE_GAIN     -0.35f
+#define VC_VEL_COUPLE_GAIN     -0.3205f
+
+/* 小车加速度前馈: 小车起步时预判钢珠惯性后滚, 提前推杆 (0=关闭) */
+#define VC_CAR_ACCEL_FF_GAIN   0.05f
 
 /* ═══════════════════════════════════════════════════════════════
- *  滤波 & 控制参数
+ *  滤波 & 控制参数 
  * ═══════════════════════════════════════════════════════════════ */
 
 /* 输出限幅: 电机最大角速度 (deg/s) */
